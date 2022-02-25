@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="height=device-height, width=device-width, initial-scale=1.0, minimal-ui">
+    <title></title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #aab;
+            font-size: 16px;
+        }
+
+        .wrapper {
+            max-width: 800px;
+            max-height: 600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        canvas {
+            border: solid 5px black;
+            margin: 0;
+            padding: 0;
+            image-rendering: optimizeSpeed; /* Older versions of FF */
+            image-rendering: -moz-crisp-edges; /* FF 6.0+ */
+            image-rendering: -webkit-optimize-contrast; /* Safari */
+            image-rendering: -o-crisp-edges; /* OS X & Windows Opera (12.02+) */
+            image-rendering: pixelated; /* Awesome future-browsers */
+            -ms-interpolation-mode: nearest-neighbor; /* IE */
+        }
+
+        #canvas {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<div class="wrapper">
+    <div id="canvasHolder" class="canvasHolder">
+        <canvas id="canvas" width="800" height="600" style="background:#000000;"></canvas>
+    </div>
+
+    <div id="debug"/>
+</div>
+
+<script type="module" src="./app.js"></script><!-- you need type="module" to be able to use import statements inside included js -->
+
+</body>
+</html>
