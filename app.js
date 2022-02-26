@@ -18,20 +18,27 @@ const playerSpeed = 10;
 const player = {
     x: innerMap.x,
     y: innerMap.y,
-    rotation: 0,
     speed: playerSpeed,
     width: playerWidth,
-    height: playerHeight
+    height: playerHeight,
+    directions: {
+        right: false,
+        left: false,
+        up: false,
+        down: false
+    }
 }
 
-// todo: should move to 50x50
+// todo: should really move to 50x50
 const tile = {
     w: 100,
     h: 100
 }
 
 const engine = {
-    showGrid: false
+    showGrid: false,
+    tileWidth: 100,
+    tileHeight: 100
 }
 
 const animations = [];
@@ -74,11 +81,7 @@ let area = [
 let KEYCODE_LEFT = 37,
     KEYCODE_UP = 38,
     KEYCODE_RIGHT = 39,
-    KEYCODE_DOWN = 40,
-    leftHeld = false,
-    rightHeld = false,
-    upHeld = false,
-    downHeld = false;
+    KEYCODE_DOWN = 40;
 
 // get the canvas context
 const context = document.getElementById('canvas').getContext('2d');
@@ -86,20 +89,16 @@ const context = document.getElementById('canvas').getContext('2d');
 const handleKeyDown = e => {
     switch (e.keyCode) {
         case KEYCODE_LEFT:
-            leftHeld = true;
-            player.rotation = 0;
+            player.directions.left = true;
             break;
         case KEYCODE_UP:
-            upHeld = true;
-            player.rotation = 90;
+            player.directions.up = true;
             break;
         case KEYCODE_RIGHT:
-            rightHeld = true;
-            player.rotation = 180;
+            player.directions.right = true;
             break;
         case KEYCODE_DOWN:
-            downHeld = true;
-            player.rotation = 270;
+            player.directions.down = true;
             break;
     }
 }
@@ -107,20 +106,16 @@ const handleKeyDown = e => {
 const handleKeyUp = e => {
     switch (e.keyCode) {
         case KEYCODE_LEFT:
-            leftHeld = false;
-            leftHeldTimer = 0;
+            player.directions.left = false;
             break;
         case KEYCODE_RIGHT:
-            rightHeld = false;
-            rightHeldTimer = 0;
+            player.directions.right = false;
             break;
         case KEYCODE_UP:
-            upHeld = false;
-            upHeldTimer = 0;
+            player.directions.up = false;
             break;
         case KEYCODE_DOWN:
-            downHeld = false;
-            downHeldTimer = 0;
+            player.directions.down = false;
             break;
     }
 }
@@ -272,16 +267,20 @@ const getSpriteSheetByHandle = handle => {
     }
 }
 
+const getSprite = () => {
+    if (player.directions.left) { return 'walk_left' }
+    if (player.directions.right) { return 'walk_right' }
+    if (player.directions.down) { return 'walk_down' }
+    if (player.directions.up) { return 'walk_up' }
+
+    return 'walk_down';
+}
+
 const drawPlayer = () => {
     const sheetOffset = 0;
-    let sprite = null;
+    let sprite = getSprite();
 
-    if (leftHeld) { sprite = getSpriteSheetByHandle('walk_left')['img'] }
-    if (rightHeld) { sprite = getSpriteSheetByHandle('walk_right')['img'] }
-    if (downHeld) { sprite = getSpriteSheetByHandle('walk_down')['img'] }
-    if (upHeld) { sprite = getSpriteSheetByHandle('walk_up')['img'] }
-
-    if (!sprite) { sprite = getSpriteSheetByHandle('walk_down')['img'] }
+    const imgData = getSpriteSheetByHandle(sprite).img;
 
     context.save();
 
@@ -296,7 +295,7 @@ const drawPlayer = () => {
     // ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, width, height);
     // only if you include all these params, are you able to clip the image. clip start is sx, sy, sWidth and sHeight determine
     // the clip dimensions, x, y set the starting position (upper-left corner) and width, height are the final sprite dimensions
-    context.drawImage(sprite, sheetOffset, 0, player.width, player.height, 0, 0, player.width, player.height);
+    context.drawImage(imgData, sheetOffset, 0, player.width, player.height, 0, 0, player.width, player.height);
     context.restore();
 }
 
@@ -306,20 +305,22 @@ const drawTileAt = (x, y, tileType) => {
 
     if (engine.showGrid) {
         context.lineWidth = 3;
-        context.strokeRect(x, y, 100, 100);
+        context.strokeRect(x, y, engine.tileWidth, engine.tileHeight);
     }
 }
 
 
 const drawTiles = () => {
-    for (let y = -100; y < 800; y += 100) {
-        for (let x = -100; x < 1000; x += 100) {
-            const tileX = Math.floor((player.x + x - innerMap.x) / 100);
-            const tileY = Math.floor((player.y + y - innerMap.y) / 100);
+    for (let y = -engine.tileHeight; y < 800; y += engine.tileHeight) {
+        for (let x = -engine.tileWidth; x < (800 + 2 * engine.tileWidth); x += engine.tileWidth) {
+            const tileX = Math.floor((player.x + x - innerMap.x) / engine.tileWidth);
+            const tileY = Math.floor((player.y + y - innerMap.y) / engine.tileHeight);
 
+            // todo: do programmatically
             if (tileX < 0 || tileY < 0 || tileX > 29 || tileY > 29) {
-                // todo: do programmatically
+
                 // nothing to render here: at the edge of the map and trying to render out-of-bounds tile "off-screen"
+
             } else {
                 const tileId = area[tileY][tileX];
 
@@ -328,21 +329,21 @@ const drawTiles = () => {
                 if (innerMap.x >= 400) {
                     const diffToX = innerMap.x - 400;
                     const startX = (player.x - diffToX) - 400;
-                    posX = x - (startX % 100);
+                    posX = x - (startX % engine.tileWidth);
                 } else {
                     const diffToX = 400 - innerMap.x;
                     const startX = 400 - (player.x + diffToX);
-                    posX = x + (startX % 100);
+                    posX = x + (startX % engine.tileWidth);
                 }
 
                 if (innerMap.y >= 300) {
                     const diffToY = innerMap.y - 300;
                     const startY = (player.y - diffToY) - 300;
-                    posY = y - (startY % 100);
+                    posY = y - (startY % engine.tileHeight);
                 } else {
                     const diffToY = 300 - innerMap.y;
                     const startY = 300 - (player.y + diffToY);
-                    posY = y + (startY % 100);
+                    posY = y + (startY % engine.tileHeight);
                 }
 
                 drawTileAt(posX, posY, findImageObjectInArrayById(tileId));
@@ -352,8 +353,8 @@ const drawTiles = () => {
 }
 
 const getTileType = () => {
-    const tileX = Math.floor((player.x) / 100);
-    const tileY = Math.floor((player.y) / 100);
+    const tileX = Math.floor((player.x) / engine.tileWidth);
+    const tileY = Math.floor((player.y) / engine.tileHeight);
     const tileId = area[tileY][tileX];
 
     return findImageObjectInArrayById(tileId);
@@ -366,28 +367,28 @@ const movePlayer = () => {
     const currentInnerMapY = innerMap.y;
     const speed = player.speed;
 
-    // the outerMap dimensions are as wide as the defined area minus 200 to ensure screen is always filled up with grid
-    const outerMapWidth = area[0].length * 100 - 200;
-    const outerMapHeight = area.length * 100 - 200;
+    // the outerMap dimensions are as wide as the defined area (array) minus an offset to ensure screen is always filled up with grid
+    const outerMapWidth = area[0].length * engine.tileWidth - 200;
+    const outerMapHeight = area.length * engine.tileHeight - 200;
 
     // innerMap limits are 200px from x, y game borders (800x600), so left & right: 200-600 and up & down: 200-400
 
-    if (rightHeld) {
+    if (player.directions.right) {
         const innerMapLimit = 600 - (tile.w / 2);
         const outerMapLimit = outerMapWidth - (tile.w / 2);
         if (player.x < outerMapLimit && (player.x + speed) < outerMapLimit) { player.x += speed }
         if (innerMap.x < innerMapLimit && (innerMap.x + speed) < innerMapLimit) { innerMap.x += speed }
-    } else if (leftHeld) {
+    } else if (player.directions.left) {
         const innerMapLimit = 200 + (tile.w / 2);
         const outerMapLimit = 200 + (tile.w / 2);
         if (player.x > outerMapLimit && (player.x - speed) > outerMapLimit) { player.x -= speed }
         if (innerMap.x > innerMapLimit && (innerMap.x - speed) > innerMapLimit) { innerMap.x -= speed }
-    } else if (downHeld) {
+    } else if (player.directions.down) {
         const innerMapLimit = 400 - (tile.h / 2);
         const outerMapLimit = outerMapHeight - (tile.h / 2);
         if (player.y < outerMapLimit && (player.y + speed) < outerMapLimit) { player.y += speed }
         if (innerMap.y < innerMapLimit && (innerMap.y + speed) < innerMapLimit) { innerMap.y += speed }
-    } else if (upHeld) {
+    } else if (player.directions.up) {
         const innerMapLimit = 200 + (tile.h / 2);
         const outerMapLimit = 200 + (tile.h / 2);
         if (player.y > outerMapLimit && (player.y - speed) > outerMapLimit) { player.y -= speed }
@@ -480,12 +481,6 @@ window.addEventListener('keydown', e => {
 // register document key functions
 document.onkeydown = handleKeyDown;
 document.onkeyup = handleKeyUp;
-
-// registers keys that are held down
-let leftHeldTimer = 0;
-let rightHeldTimer = 0;
-let downHeldTimer = 0;
-let upHeldTimer = 0;
 
 // register global window event listener for click events
 window.addEventListener('click', clickHandler);
