@@ -11,8 +11,8 @@ const innerMap = {
     y: 300
 }
 
-const playerWidth = 75;
-const playerHeight = 48;
+const playerWidth = 50;
+const playerHeight = 50;
 const playerSpeed = 10;
 
 const player = {
@@ -21,7 +21,14 @@ const player = {
     speed: playerSpeed,
     width: playerWidth,
     height: playerHeight,
-    directions: {
+    direction: 'down',
+}
+
+const engine = {
+    debug: true,
+    tileWidth: 50,
+    tileHeight: 50,
+    keys: {
         right: false,
         left: false,
         up: false,
@@ -29,59 +36,48 @@ const player = {
     }
 }
 
-// todo: should really move to 50x50
-const tile = {
-    w: 100,
-    h: 100
-}
-
-const engine = {
-    showGrid: false,
-    tileWidth: 100,
-    tileHeight: 100
-}
-
 const animations = [];
 
-// note the outside 2 grid units are not traversable, therefore its turned into water
+// note the outside 4 grid units are not traversable, therefore its turned into water
 let area = [
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,2,2,2,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,3,4,4,4,4,4,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,3,4,7,4,4,7,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,6,8,0,6,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    [900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900],
+    [900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900],
+    [900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900],
+    [900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900],
+    [900,900,900,900,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,902,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,901,901,901,901,901,902,901,901,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,902,901,901,901,901,901,903,903,901,901,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,901,901,901,901,903,903,901,901,901,901,901,901,902,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,901,901,901,902,901,901,901,901,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,902,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,902,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,901,901,901,901,901,901,902,901,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,111,902,901,901,901,901,901,112,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,108,901,901,901,901,107,107,109,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,108,901,901,901,110,104,104,105,901,902,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,108,901,901,901,110,101,113,102,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,106,107,107,107,109,901,902,901,901,901,901,901,901,901,901,901,901,902,900,900,900,900],
+    [900,900,900,900,901,902,901,901,103,104,104,104,105,901,901,901,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,100,101,101,101,102,901,901,901,901,901,901,901,901,901,901,902,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,901,901,901,901,901,901,901,901,901,902,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,902,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,901,901,901,901,901,902,901,901,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,902,901,902,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,901,901,901,901,901,901,901,902,901,901,901,901,901,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,901,902,901,901,901,901,901,900,900,900,900],
+    [900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900],
+    [900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900],
+    [900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900],
+    [900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900]
 ];
 
 // set some vars that handle key mapping
 let KEYCODE_LEFT = 37,
     KEYCODE_UP = 38,
     KEYCODE_RIGHT = 39,
-    KEYCODE_DOWN = 40;
+    KEYCODE_DOWN = 40,
+    KEYCODE_DEBUG = 68;
 
 // get the canvas context
 const context = document.getElementById('canvas').getContext('2d');
@@ -89,16 +85,20 @@ const context = document.getElementById('canvas').getContext('2d');
 const handleKeyDown = e => {
     switch (e.keyCode) {
         case KEYCODE_LEFT:
-            player.directions.left = true;
+            engine.keys.left = true;
+            player.direction = 'left';
             break;
         case KEYCODE_UP:
-            player.directions.up = true;
+            engine.keys.up = true;
+            player.direction = 'up';
             break;
         case KEYCODE_RIGHT:
-            player.directions.right = true;
+            engine.keys.right = true;
+            player.direction = 'right';
             break;
         case KEYCODE_DOWN:
-            player.directions.down = true;
+            engine.keys.down = true;
+            player.direction = 'down';
             break;
     }
 }
@@ -106,118 +106,175 @@ const handleKeyDown = e => {
 const handleKeyUp = e => {
     switch (e.keyCode) {
         case KEYCODE_LEFT:
-            player.directions.left = false;
+            engine.keys.left = false;
             break;
         case KEYCODE_RIGHT:
-            player.directions.right = false;
+            engine.keys.right = false;
             break;
         case KEYCODE_UP:
-            player.directions.up = false;
+            engine.keys.up = false;
             break;
         case KEYCODE_DOWN:
-            player.directions.down = false;
+            engine.keys.down = false;
+            break;
+        case KEYCODE_DEBUG:
+            engine.debug = engine.debug !== true;
             break;
     }
 }
 
 let assetsLoaded = false;
 
-// define image assets
-const images = [
+const tiles = [
     {
-        id: 0,
-        handle: 'grass',
-        src: 'grass.png',
+        id: 100,
+        handle: '100_rock_front_bottom_left',
+        src: '/assets/tiles/rock/100_rock_front_bottom_left.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+     {
+        id: 101,
+        handle: '101_rock_front_bottom_center',
+        src: '/assets/tiles/rock/101_rock_front_bottom_center.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+     {
+        id: 102,
+        handle: '102_rock_front_bottom_right',
+        src: '/assets/tiles/rock/102_rock_front_bottom_right.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+     {
+        id: 103,
+        handle: '103_rock_front_top_left',
+        src: '/assets/tiles/rock/103_rock_front_top_left.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+     {
+        id: 104,
+        handle: '104_rock_front_top_center',
+        src: '/assets/tiles/rock/104_rock_front_top_center.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+     {
+        id: 105,
+        handle: '105_rock_front_top_right',
+        src: '/assets/tiles/rock/105_rock_front_top_right.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+     {
+        id: 106,
+        handle: '106_rock_left_bottom',
+        src: '/assets/tiles/rock/106_rock_left_bottom.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+     {
+        id: 107,
+        handle: '107_rock_center_bottom',
+        src: '/assets/tiles/rock/107_rock_center_bottom.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+     {
+        id: 108,
+        handle: '108_rock_left_middle',
+        src: '/assets/tiles/rock/108_rock_left_middle.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+     {
+        id: 109,
+        handle: '109_rock_right_bottom',
+        src: '/assets/tiles/rock/109_rock_right_bottom.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+     {
+        id: 110,
+        handle: '110_rock_right_middle',
+        src: '/assets/tiles/rock/110_rock_right_middle.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+     {
+        id: 111,
+        handle: '111_rock_left_top',
+        src: '/assets/tiles/rock/111_rock_left_top.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+     {
+        id: 112,
+        handle: '112_rock_right_top',
+        src: '/assets/tiles/rock/112_rock_right_top.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+     {
+        id: 113,
+        handle: '113_rock_entrance',
+        src: '/assets/tiles/rock/113_rock_entrance.png',
         img: new Image(),
         structure: Structures.SOLID
     },
     {
-        id: 1,
-        handle: 'water',
-        src: 'blue.png',
+        id: 900,
+        handle: 'sea',
+        src: '/assets/tiles/900_sea.png',
+        img: new Image(),
+        structure: Structures.BLOCK
+    },
+    {
+        id: 901,
+        handle: 'grass_a',
+        src: '/assets/tiles/901_grass_a.png',
+        img: new Image(),
+        structure: Structures.SOLID
+    },
+    {
+        id: 902,
+        handle: 'grass_b',
+        src: '/assets/tiles/902_grass_b.png',
+        img: new Image(),
+        structure: Structures.SOLID
+    },
+    {
+        id: 903,
+        handle: '903_pond',
+        src: '/assets/tiles/903_pond.png',
         img: new Image(),
         structure: Structures.LIQUID
-    },
-    {
-        id: 2,
-        handle: 'floor',
-        src: 'purple.png',
-        img: new Image(),
-        structure: Structures.SOLID
-    },
-    {
-        id: 3,
-        handle: 'rock_side_left',
-        src: 'rock_side_left.png',
-        img: new Image(),
-        structure: Structures.BLOCK
-    },
-    {
-        id: 4,
-        handle: 'rock',
-        src: 'rock.png',
-        img: new Image(),
-        structure: Structures.SOLID
-    },
-    {
-        id: 5,
-        handle: 'rock_side_right',
-        src: 'rock_side_right.png',
-        img: new Image(),
-        structure: Structures.BLOCK
-    },
-    {
-        id: 6,
-        handle: 'rock_corner_left',
-        src: 'rock_corner_left.png',
-        img: new Image(),
-        structure: Structures.BLOCK
-    },
-    {
-        id: 7,
-        handle: 'rock_corner_front',
-        src: 'rock_corner_front.png',
-        img: new Image(),
-        structure: Structures.BLOCK
-    },
-    {
-        id: 8,
-        handle: 'rock_corner_right',
-        src: 'rock_corner_right.png',
-        img: new Image(),
-        structure: Structures.BLOCK
-    }
-];
-
-const characters = [
-    {
-        handle: 'main',
-        src: 'test.png',
-        img: new Image()
     }
 ];
 
 const spriteSheets = [
     {
-        handle: 'walk_down',
-        src: 'char01.png',
+        handle: 'hero_sheet_left',
+        src: '/assets/characters/hero/hero_sheet_left.png',
         img: new Image()
     },
     {
-        handle: 'walk_up',
-        src: 'char02.png',
+        handle: 'hero_sheet_right',
+        src: '/assets/characters/hero/hero_sheet_right.png',
         img: new Image()
     },
     {
-        handle: 'walk_left',
-        src: 'char03.png',
+        handle: 'hero_sheet_up',
+        src: '/assets/characters/hero/hero_sheet_up.png',
         img: new Image()
     },
     {
-        handle: 'walk_right',
-        src: 'char04.png',
+        handle: 'hero_sheet_down',
+        src: '/assets/characters/hero/hero_sheet_down.png',
         img: new Image()
-    },
+    }
 ]
 
 const clickHandler = event => {
@@ -231,8 +288,9 @@ const loadImage = image => {
 const areAllImageAssetsLoaded = () => {
     let loaded = true;
 
-    for (let loadedBitmap = 0; loadedBitmap < images.length; loadedBitmap++) {
-        if (!images[loadedBitmap] || !images[loadedBitmap].img.naturalWidth) {
+    // check tiles
+    for (let loadedTile = 0; loadedTile < tiles.length; loadedTile++) {
+        if (!tiles[loadedTile] || !tiles[loadedTile].img.naturalWidth) {
             loaded = false;
         }
     }
@@ -243,18 +301,9 @@ const areAllImageAssetsLoaded = () => {
 const findImageObjectInArrayById = id => {
 
     // todo: what ugly lookup is this?! also  name is poor. it does return object but why state that it does?!
-    for (let imageObject = 0; imageObject < images.length; imageObject++) {
-        if (images[imageObject]['id'] === id) {
-            return images[imageObject];
-        }
-    }
-}
-
-// todo: on second thought this is a bad idea
-const findCharacterObjectInArrayById = id => {
-    for (let imageObject = 0; imageObject < characters.length; imageObject++) {
-        if (characters[imageObject]['id'] === id) {
-            return characters[imageObject];
+    for (let imageObject = 0; imageObject < tiles.length; imageObject++) {
+        if (tiles[imageObject]['id'] === id) {
+            return tiles[imageObject];
         }
     }
 }
@@ -267,18 +316,18 @@ const getSpriteSheetByHandle = handle => {
     }
 }
 
-const getSprite = () => {
-    if (player.directions.left) { return 'walk_left' }
-    if (player.directions.right) { return 'walk_right' }
-    if (player.directions.down) { return 'walk_down' }
-    if (player.directions.up) { return 'walk_up' }
+const getSprite = infix => {
+    if (player.direction === 'left') { return `${infix}_left` }
+    if (player.direction === 'right') { return `${infix}_right` }
+    if (player.direction === 'up') { return `${infix}_up` }
+    if (player.direction === 'down') { return `${infix}_down` }
 
-    return 'walk_down';
+    return `${infix}_down`;
 }
 
 const drawPlayer = () => {
     const sheetOffset = 0;
-    let sprite = getSprite();
+    let sprite = getSprite('hero_sheet');
 
     const imgData = getSpriteSheetByHandle(sprite).img;
 
@@ -288,14 +337,20 @@ const drawPlayer = () => {
     context.translate(innerMap.x, innerMap.y);
 
     // manually tweak the positioning of the player sprite
-    const centeredX = -12;
-    const centeredY = -30;
+    const centeredX = -engine.tileWidth / 2;
+    const centeredY = -engine.tileHeight / 2;
     context.translate(centeredX, centeredY);
 
     // ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, width, height);
     // only if you include all these params, are you able to clip the image. clip start is sx, sy, sWidth and sHeight determine
     // the clip dimensions, x, y set the starting position (upper-left corner) and width, height are the final sprite dimensions
     context.drawImage(imgData, sheetOffset, 0, player.width, player.height, 0, 0, player.width, player.height);
+
+    if (engine.debug) {
+        context.strokeStyle = 'red';
+        context.strokeRect(0, 0, 50, 50);
+    }
+
     context.restore();
 }
 
@@ -303,8 +358,8 @@ const drawTileAt = (x, y, tileType) => {
     context.drawImage(tileType['img'], x, y, tileType['img'].width, tileType['img'].height);
     context.strokeStyle='#000000';
 
-    if (engine.showGrid) {
-        context.lineWidth = 3;
+    if (engine.debug) {
+        context.lineWidth = 1;
         context.strokeRect(x, y, engine.tileWidth, engine.tileHeight);
     }
 }
@@ -373,26 +428,26 @@ const movePlayer = () => {
 
     // innerMap limits are 200px from x, y game borders (800x600), so left & right: 200-600 and up & down: 200-400
 
-    if (player.directions.right) {
-        const innerMapLimit = 600 - (tile.w / 2);
-        const outerMapLimit = outerMapWidth - (tile.w / 2);
-        if (player.x < outerMapLimit && (player.x + speed) < outerMapLimit) { player.x += speed }
-        if (innerMap.x < innerMapLimit && (innerMap.x + speed) < innerMapLimit) { innerMap.x += speed }
-    } else if (player.directions.left) {
-        const innerMapLimit = 200 + (tile.w / 2);
-        const outerMapLimit = 200 + (tile.w / 2);
-        if (player.x > outerMapLimit && (player.x - speed) > outerMapLimit) { player.x -= speed }
-        if (innerMap.x > innerMapLimit && (innerMap.x - speed) > innerMapLimit) { innerMap.x -= speed }
-    } else if (player.directions.down) {
-        const innerMapLimit = 400 - (tile.h / 2);
-        const outerMapLimit = outerMapHeight - (tile.h / 2);
-        if (player.y < outerMapLimit && (player.y + speed) < outerMapLimit) { player.y += speed }
-        if (innerMap.y < innerMapLimit && (innerMap.y + speed) < innerMapLimit) { innerMap.y += speed }
-    } else if (player.directions.up) {
-        const innerMapLimit = 200 + (tile.h / 2);
-        const outerMapLimit = 200 + (tile.h / 2);
-        if (player.y > outerMapLimit && (player.y - speed) > outerMapLimit) { player.y -= speed }
-        if (innerMap.y > innerMapLimit && (innerMap.y - speed) > innerMapLimit) { innerMap.y -= speed }
+    if (engine.keys.right) {
+        const innerMapLimit = 600 - (engine.tileWidth / 2);
+        const outerMapLimit = outerMapWidth - (engine.tileWidth / 2);
+        if (player.x <= outerMapLimit && (player.x + speed) <= outerMapLimit) { player.x += speed } else { player.x = outerMapLimit }
+        if (innerMap.x <= innerMapLimit && (innerMap.x + speed) <= innerMapLimit) { innerMap.x += speed } else { innerMap.x = innerMapLimit }
+    } else if (engine.keys.left) {
+        const innerMapLimit = 200 + (engine.tileWidth / 2);
+        const outerMapLimit = 200 + (engine.tileWidth / 2);
+        if (player.x >= outerMapLimit && (player.x - speed) >= outerMapLimit) { player.x -= speed } else { player.x = outerMapLimit }
+        if (innerMap.x >= innerMapLimit && (innerMap.x - speed) >= innerMapLimit) { innerMap.x -= speed } else { innerMap.x = innerMapLimit }
+    } else if (engine.keys.down) {
+        const innerMapLimit = 400 - (engine.tileHeight / 2);
+        const outerMapLimit = outerMapHeight - (engine.tileHeight / 2);
+        if (player.y <= outerMapLimit && (player.y + speed) <= outerMapLimit) { player.y += speed } else { player.y = outerMapLimit }
+        if (innerMap.y <= innerMapLimit && (innerMap.y + speed) <= innerMapLimit) { innerMap.y += speed } else { innerMap.y = innerMapLimit }
+    } else if (engine.keys.up) {
+        const innerMapLimit = 200 + (engine.tileHeight / 2);
+        const outerMapLimit = 200 + (engine.tileHeight / 2);
+        if (player.y >= outerMapLimit && (player.y - speed) >= outerMapLimit) { player.y -= speed } else { player.y = outerMapLimit }
+        if (innerMap.y >= innerMapLimit && (innerMap.y - speed) >= innerMapLimit) { innerMap.y -= speed } else { innerMap.y = innerMapLimit }
     }
 
     const tileType = getTileType();
@@ -459,11 +514,7 @@ const updateCanvas = timestamp => {
 }
 
 // call the loadImage function for each defined image
-images.map(image => {
-    loadImage(image);
-});
-
-characters.map(image => {
+tiles.map(image => {
     loadImage(image);
 });
 
