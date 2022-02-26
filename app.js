@@ -7,8 +7,8 @@ let progress = 0;
 const innerMap = {
     w: 400,
     h: 300,
-    x: 400,
-    y: 300
+    x: 355,
+    y: 325
 }
 
 const playerWidth = 50;
@@ -16,8 +16,8 @@ const playerHeight = 50;
 const playerSpeed = 10;
 
 const player = {
-    x: innerMap.x,
-    y: innerMap.y,
+    x: 910,
+    y: 930,
     speed: playerSpeed,
     width: playerWidth,
     height: playerHeight,
@@ -25,7 +25,7 @@ const player = {
 }
 
 const engine = {
-    debug: true,
+    debug: false,
     tileWidth: 50,
     tileHeight: 50,
     keys: {
@@ -71,6 +71,21 @@ let area = [
     [900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900],
     [900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900]
 ];
+
+let objects = [
+    {
+        id: 100,
+        x: 7,
+        y: 7,
+        handle: '103_rock_front_top_left',
+        src: '/assets/objects/100_rock_a.png',
+        img: new Image(),
+        structure: Structures.BLOCK, // trap, item etc.
+        status: 'shown' // picked up etc.
+    },
+]
+
+let tempObjects = [];
 
 // set some vars that handle key mapping
 let KEYCODE_LEFT = 37,
@@ -295,15 +310,22 @@ const areAllImageAssetsLoaded = () => {
         }
     }
 
+    // check objects
+    for (let loadedObject = 0; objects < objects.length; objects++) {
+        if (!objects[objects] || !objects[objects].img.naturalWidth) {
+            loaded = false;
+        }
+    }
+
     return loaded;
 }
 
-const findImageObjectInArrayById = id => {
+const findTileById = id => {
 
-    // todo: what ugly lookup is this?! also  name is poor. it does return object but why state that it does?!
-    for (let imageObject = 0; imageObject < tiles.length; imageObject++) {
-        if (tiles[imageObject]['id'] === id) {
-            return tiles[imageObject];
+    // todo: what ugly lookup is this?! fix it!
+    for (let tile = 0; tile < tiles.length; tile++) {
+        if (tiles[tile]['id'] === id) {
+            return tiles[tile];
         }
     }
 }
@@ -401,18 +423,65 @@ const drawTiles = () => {
                     posY = y + (startY % engine.tileHeight);
                 }
 
-                drawTileAt(posX, posY, findImageObjectInArrayById(tileId));
+                drawTileAt(posX, posY, findTileById(tileId));
             }
         }
     }
 }
 
-const getTileType = () => {
+const getTileCoordinates = () => {
+    const tileX = Math.floor((player.x) / engine.tileWidth);
+    const tileY = Math.floor((player.y) / engine.tileHeight);
+
+    return [tileX, tileY];
+}
+
+const drawObjects = () => {
+    let startGridX = Math.floor((player.x - innerMap.x) / engine.tileWidth);
+    let endGridX = Math.floor((player.x + 900 - innerMap.x) / engine.tileWidth);
+    let startGridY = Math.floor((player.y - innerMap.y) / engine.tileHeight);
+    let endGridY = Math.floor((player.y + 800 - innerMap.y) / engine.tileHeight);
+
+    tempObjects = objects.filter(obj =>
+        obj.x >= startGridX &&
+        obj.x <= endGridX &&
+        obj.y >= startGridY &&
+        obj.y <= endGridY);
+
+    tempObjects.forEach(obj => {
+        context.drawImage(
+            obj.img,
+            (obj.x * engine.tileWidth) - player.x + innerMap.x,
+            (obj.y * engine.tileHeight) - player.y + innerMap.y,
+            obj['img'].width,
+            obj['img'].height
+        );
+    });
+}
+
+const findObjectById = id => {
+
+}
+
+const getTileForCurrentGridPosition = () => {
+
+    // todo: use helper and implement in other places too
     const tileX = Math.floor((player.x) / engine.tileWidth);
     const tileY = Math.floor((player.y) / engine.tileHeight);
     const tileId = area[tileY][tileX];
 
-    return findImageObjectInArrayById(tileId);
+    return findTileById(tileId);
+}
+
+const getObjectForCurrentGridPosition = () => {
+    const tileX = Math.floor((player.x) / engine.tileWidth);
+    const tileY = Math.floor((player.y) / engine.tileHeight);
+
+    for (let obj = 0; obj < tempObjects.length; obj++) {
+        if (tempObjects[obj].x === tileX && tempObjects[obj].y === tileY ) {
+            return tempObjects[obj];
+        }
+    }
 }
 
 const movePlayer = () => {
@@ -450,7 +519,9 @@ const movePlayer = () => {
         if (innerMap.y >= innerMapLimit && (innerMap.y - speed) >= innerMapLimit) { innerMap.y -= speed } else { innerMap.y = innerMapLimit }
     }
 
-    const tileType = getTileType();
+    // todo: move tile & object detection below outside of this function
+
+    const tileType = getTileForCurrentGridPosition();
 
     // player moves through liquid
     if (tileType.structure === Structures.LIQUID) {
@@ -461,15 +532,33 @@ const movePlayer = () => {
         player.height = playerHeight;
     }
 
-    // reset due to obstacle
     if (tileType.structure === Structures.BLOCK) {
+
+        // reset due to obstacle
         player.x = currentX;
         player.y = currentY;
         innerMap.x = currentInnerMapX;
         innerMap.y = currentInnerMapY;
+    } else {
+        // deal with other types of tile Structures like water fire snow etc
+    }
+
+    let currentObject = getObjectForCurrentGridPosition();
+
+    if (currentObject && currentObject.structure === Structures.BLOCK) {
+
+        // reset due to obstacle
+        player.x = currentX;
+        player.y = currentY;
+        innerMap.x = currentInnerMapX;
+        innerMap.y = currentInnerMapY;
+    } else {
+        // deal with other types of object Structures like pick-ups, death traps etc.
     }
 }
 
+
+// todo: move to Helpers
 const clearCanvas = () => {
     context.fillStyle = '#ddd';
     context.fillRect(0, 0, 800, 600);
@@ -481,12 +570,15 @@ const updateCanvas = timestamp => {
     if (assetsLoaded) {
         movePlayer();
         drawTiles();
+        drawObjects();
         drawPlayer();
 
         const debugElem = document.querySelector('#debug');
 
-        if (debugElem) {
-            debugElem.innerHTML = `x: ${player.x} y: ${player.y}`;
+        if (engine.debug && debugElem) {
+            const coords = getTileCoordinates();
+
+            debugElem.innerHTML = `playerX: ${player.x} innerMapX: ${innerMap.x} gridX: ${coords[0]} playerY: ${player.y} innerMapY:${innerMap.y} gridY: ${coords[1]}`;
         }
     }
 
@@ -520,6 +612,10 @@ tiles.map(image => {
 
 spriteSheets.map(image => {
     loadImage(image);
+});
+
+objects.map(object => {
+    loadImage(object);
 });
 
 // disable page movement using cursor keys
