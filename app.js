@@ -1,3 +1,5 @@
+import helpers from './helpers/index.js';
+
 import Structures from './constants/Structures.js';
 
 let start = null;
@@ -13,7 +15,7 @@ const innerMap = {
 
 const playerWidth = 50;
 const playerHeight = 50;
-const playerSpeed = 10;
+const playerSpeed = 5;
 
 const player = {
     x: 910,
@@ -26,6 +28,8 @@ const player = {
 
 const engine = {
     debug: false,
+    fpsTimer: [],
+    rasterLines: true,
     tileWidth: 50,
     tileHeight: 50,
     keys: {
@@ -35,8 +39,6 @@ const engine = {
         down: false
     }
 }
-
-const animations = [];
 
 // note the outside 4 grid units are not traversable, therefore its turned into water
 let area = [
@@ -320,25 +322,9 @@ const areAllImageAssetsLoaded = () => {
     return loaded;
 }
 
-const findTileById = id => {
-
-    // todo: what ugly lookup is this?! fix it!
-    for (let tile = 0; tile < tiles.length; tile++) {
-        if (tiles[tile]['id'] === id) {
-            return tiles[tile];
-        }
-    }
-}
-
-const getSpriteSheetByHandle = handle => {
-    for (let imageObject = 0; imageObject < spriteSheets.length; imageObject++) {
-        if (spriteSheets[imageObject]['handle'] === handle) {
-            return spriteSheets[imageObject];
-        }
-    }
-}
-
-const getSprite = infix => {
+// returns the sprite identifier based on the direction of the player
+// todo: leverage this when dealing with npc's
+const getSpriteHandle = infix => {
     if (player.direction === 'left') { return `${infix}_left` }
     if (player.direction === 'right') { return `${infix}_right` }
     if (player.direction === 'up') { return `${infix}_up` }
@@ -347,9 +333,10 @@ const getSprite = infix => {
     return `${infix}_down`;
 }
 
+// draws the player on screen
 const drawPlayer = () => {
     const sheetOffset = 0;
-    let sprite = getSprite('hero_sheet');
+    let sprite = getSpriteHandle('hero_sheet');
 
     const imgData = getSpriteSheetByHandle(sprite).img;
 
@@ -386,7 +373,7 @@ const drawTileAt = (x, y, tileType) => {
     }
 }
 
-
+// draw all tiles within range
 const drawTiles = () => {
     for (let y = -engine.tileHeight; y < 800; y += engine.tileHeight) {
         for (let x = -engine.tileWidth; x < (800 + 2 * engine.tileWidth); x += engine.tileWidth) {
@@ -423,12 +410,13 @@ const drawTiles = () => {
                     posY = y + (startY % engine.tileHeight);
                 }
 
-                drawTileAt(posX, posY, findTileById(tileId));
+                drawTileAt(posX, posY, getTileById(tileId));
             }
         }
     }
 }
 
+// convert player coordinates to grid coordinates
 const getTileCoordinates = () => {
     const tileX = Math.floor((player.x) / engine.tileWidth);
     const tileY = Math.floor((player.y) / engine.tileHeight);
@@ -436,18 +424,23 @@ const getTileCoordinates = () => {
     return [tileX, tileY];
 }
 
+// draws all objects within range
 const drawObjects = () => {
+
+    // determine range
     let startGridX = Math.floor((player.x - innerMap.x) / engine.tileWidth);
     let endGridX = Math.floor((player.x + 900 - innerMap.x) / engine.tileWidth);
     let startGridY = Math.floor((player.y - innerMap.y) / engine.tileHeight);
     let endGridY = Math.floor((player.y + 800 - innerMap.y) / engine.tileHeight);
 
+    // reduce objects collection
     tempObjects = objects.filter(obj =>
         obj.x >= startGridX &&
         obj.x <= endGridX &&
         obj.y >= startGridY &&
         obj.y <= endGridY);
 
+    // draw objects
     tempObjects.forEach(obj => {
         context.drawImage(
             obj.img,
@@ -459,29 +452,50 @@ const drawObjects = () => {
     });
 }
 
-const findObjectById = id => {
+// returns tile instance for given id
+const getTileById = id => {
 
+    // todo: what ugly lookup is this?! fix it!
+    for (let tile = 0; tile < tiles.length; tile++) {
+        if (tiles[tile]['id'] === id) {
+            return tiles[tile];
+        }
+    }
 }
 
+// returns sprite sheet instance for given handle
+const getSpriteSheetByHandle = handle => {
+
+    // todo: what ugly lookup is this?! fix it!
+    for (let spriteSheet = 0; spriteSheet < spriteSheets.length; spriteSheet++) {
+        if (spriteSheets[spriteSheet]['handle'] === handle) {
+            return spriteSheets[spriteSheet];
+        }
+    }
+}
+
+// returns tile instance for grid x, y
 const getTileForCurrentGridPosition = () => {
+    const tileCoords = getTileCoordinates();
+    const tileX = tileCoords[0];
+    const tileY = tileCoords[1];
 
-    // todo: use helper and implement in other places too
-    const tileX = Math.floor((player.x) / engine.tileWidth);
-    const tileY = Math.floor((player.y) / engine.tileHeight);
-    const tileId = area[tileY][tileX];
-
-    return findTileById(tileId);
+    return getTileById(area[tileY][tileX]);
 }
 
+// returns object instance for grid x, y (if it exists)
 const getObjectForCurrentGridPosition = () => {
-    const tileX = Math.floor((player.x) / engine.tileWidth);
-    const tileY = Math.floor((player.y) / engine.tileHeight);
+    const tileCoords = getTileCoordinates();
+    const tileX = tileCoords[0];
+    const tileY = tileCoords[1];
 
     for (let obj = 0; obj < tempObjects.length; obj++) {
         if (tempObjects[obj].x === tileX && tempObjects[obj].y === tileY ) {
             return tempObjects[obj];
         }
     }
+
+    return null;
 }
 
 const movePlayer = () => {
@@ -519,8 +533,12 @@ const movePlayer = () => {
         if (innerMap.y >= innerMapLimit && (innerMap.y - speed) >= innerMapLimit) { innerMap.y -= speed } else { innerMap.y = innerMapLimit }
     }
 
-    // todo: move tile & object detection below outside of this function
+    // deal with tiles and objects, handing over the old position coordinates in case player moved to invalid tile or location
+    handleTileCollision(currentX, currentY, currentInnerMapX, currentInnerMapY);
+    handleObjectCollision(currentX, currentY, currentInnerMapX, currentInnerMapY);
+}
 
+const handleTileCollision = (currentX, currentY, currentInnerMapX, currentInnerMapY) => {
     const tileType = getTileForCurrentGridPosition();
 
     // player moves through liquid
@@ -542,7 +560,9 @@ const movePlayer = () => {
     } else {
         // deal with other types of tile Structures like water fire snow etc
     }
+}
 
+const handleObjectCollision = (currentX, currentY, currentInnerMapX, currentInnerMapY) => {
     let currentObject = getObjectForCurrentGridPosition();
 
     if (currentObject && currentObject.structure === Structures.BLOCK) {
@@ -557,15 +577,8 @@ const movePlayer = () => {
     }
 }
 
-
-// todo: move to Helpers
-const clearCanvas = () => {
-    context.fillStyle = '#ddd';
-    context.fillRect(0, 0, 800, 600);
-}
-
 const updateCanvas = timestamp => {
-    clearCanvas();
+    helpers.Canvas.clearCanvas(context);
 
     if (assetsLoaded) {
         movePlayer();
@@ -573,12 +586,26 @@ const updateCanvas = timestamp => {
         drawObjects();
         drawPlayer();
 
-        const debugElem = document.querySelector('#debug');
+        if (engine.rasterLines) {
+            helpers.Canvas.rasterLines(context);
+        }
 
-        if (engine.debug && debugElem) {
-            const coords = getTileCoordinates();
+        if (engine.debug) {
+            const now = performance.now();
 
-            debugElem.innerHTML = `playerX: ${player.x} innerMapX: ${innerMap.x} gridX: ${coords[0]} playerY: ${player.y} innerMapY:${innerMap.y} gridY: ${coords[1]}`;
+            while (engine.fpsTimer.length > 0 && engine.fpsTimer[0] <= now - 1000) {
+                engine.fpsTimer.shift();
+            }
+
+            engine.fpsTimer.push(now);
+
+            const debugElem = document.querySelector('#debug');
+
+            if (debugElem) {
+                const coords = getTileCoordinates();
+
+                debugElem.innerHTML = `playerX: ${player.x} innerMapX: ${innerMap.x} gridX: ${coords[0]} playerY: ${player.y} innerMapY:${innerMap.y} gridY: ${coords[1]} fps: ${engine.fpsTimer.length}`;
+            }
         }
     }
 
@@ -601,8 +628,9 @@ const updateCanvas = timestamp => {
 
     if (progress < 1000) {
         start = null;
-        window.requestAnimationFrame(updateCanvas);
     }
+
+    setTimeout(updateCanvas, 15); // 15ms is about 60fps. despite what I've always said: do not use requestAnimationFrame!
 }
 
 // call the loadImage function for each defined image
@@ -633,4 +661,4 @@ document.onkeyup = handleKeyUp;
 window.addEventListener('click', clickHandler);
 
 // trigger update function
-window.requestAnimationFrame(updateCanvas);
+setTimeout(updateCanvas, 0);
