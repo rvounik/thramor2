@@ -667,26 +667,25 @@ const moveCharacters = () => {
     // work solely with tempCharacters which is already limited to characters that are (almost) on screen
     tempCharacters.forEach(character => {
 
-        // you need to reinstantiate the grid for each call! see https://github.com/qiao/PathFinding.js/issues/109
+        // you need to re-instantiate the grid for each call! see https://github.com/qiao/PathFinding.js/issues/109
         const grid = createPathfindingGrid();
+
+        // char has no destX,destY, calculating path to player
+        const directPath = finder.findPath(
+            helpers.Grid.xToGridX(character.x),
+            helpers.Grid.yToGridY(character.y),
+            helpers.Grid.xToGridX(player.x),
+            helpers.Grid.yToGridY(player.y),
+            grid
+        );
 
         // if no destination set recalculate path to player
         if (!character.destX || !character.destY) {
-
-            // char has no destX,destY, calculating path to player
-            const directPath = finder.findPath(
-                helpers.Grid.xToGridX(character.x),
-                helpers.Grid.yToGridY(character.y),
-                helpers.Grid.xToGridX(player.x),
-                helpers.Grid.yToGridY(player.y),
-                grid // note the grid is not checking for characters since they are dynamic resulting in expensive recalculations
-            );
-
             if (directPath && directPath.length > 2) {
 
                 if (directPath.length < character.lineOfSight) {
 
-                    // pop the last entry since that is player position and you dont want overlap
+                    // pop the last entry since that is player position and you don't want to overlap
                     directPath.pop();
 
                     // take the second entry since the first is the character position and that is already reached
@@ -695,7 +694,7 @@ const moveCharacters = () => {
                     character.destX = nextDest[0];
                     character.destY = nextDest[1];
                 } else {
-                    // player is too far away, move back to starting position
+                    // player is too far away, reset dest
                     character.destX = character.startGridX;
                     character.destY = character.startGridY;
                 }
@@ -707,38 +706,84 @@ const moveCharacters = () => {
 
             if (character.x < helpers.Grid.gridXtoX(destX)) {
                 character.x += speed;
-                character.handle=`${character.handlePrefix}_right`;
+                character.handle = `${character.handlePrefix}_right`;
                 unRegisterUnusedAnimations(character.handle, character.id);
                 registerAnimation(`${character.handlePrefix}_right`, character.id);
-                if (character.x > helpers.Grid.gridXtoX(destX)) { character.x = helpers.Grid.gridXtoX(destX)}
+                if (character.x > helpers.Grid.gridXtoX(destX)) {
+                    character.x = helpers.Grid.gridXtoX(destX)
+                }
             } else if (character.x > helpers.Grid.gridXtoX(destX)) {
                 character.x -= speed;
-                character.handle=`${character.handlePrefix}_left`;
+                character.handle = `${character.handlePrefix}_left`;
                 unRegisterUnusedAnimations(character.handle, character.id);
                 registerAnimation(`${character.handlePrefix}_left`, character.id);
-                if (character.x < helpers.Grid.gridXtoX(destX)) { character.x = helpers.Grid.gridXtoX(destX)}
+                if (character.x < helpers.Grid.gridXtoX(destX)) {
+                    character.x = helpers.Grid.gridXtoX(destX)
+                }
             } else if (character.y < helpers.Grid.gridYtoY(destY)) {
                 character.y += speed;
-                character.handle=`${character.handlePrefix}_down`;
+                character.handle = `${character.handlePrefix}_down`;
                 unRegisterUnusedAnimations(character.handle, character.id);
                 registerAnimation(`${character.handlePrefix}_down`, character.id);
-                if (character.y > helpers.Grid.gridYtoY(destY)) { character.y = helpers.Grid.gridYtoY(destY)}
+                if (character.y > helpers.Grid.gridYtoY(destY)) {
+                    character.y = helpers.Grid.gridYtoY(destY)
+                }
             } else if (character.y > helpers.Grid.gridYtoY(destY)) {
                 character.y -= speed;
-                character.handle=`${character.handlePrefix}_up`;
+                character.handle = `${character.handlePrefix}_up`;
                 unRegisterUnusedAnimations(character.handle, character.id);
                 registerAnimation(`${character.handlePrefix}_up`, character.id);
-                if (character.y < helpers.Grid.gridYtoY(destY)) { character.y = helpers.Grid.gridYtoY(destY)}
+                if (character.y < helpers.Grid.gridYtoY(destY)) {
+                    character.y = helpers.Grid.gridYtoY(destY)
+                }
+            }
+
+            if (
+                character.destX === helpers.Grid.xToGridX(player.x) &&
+                character.destY === helpers.Grid.yToGridY(player.y)
+            ) {
+                // attempt to move to tile where player is at, reset dest
+                character.destX = character.startGridX;
+                character.destY = character.startGridY;
             }
 
             if (character.x === helpers.Grid.gridXtoX(destX) && character.y === helpers.Grid.gridYtoY(destY)) {
 
+                // reached destination
+                if (helpers.Grid.xToGridX(character.x) === helpers.Grid.xToGridX(player.x)
+                    && helpers.Grid.yToGridY(character.y) === helpers.Grid.yToGridY(player.y)) {
+
+                    // on same tile as player, reset dest
+                    character.destX = character.startGridX;
+                    character.destY = character.startGridY;
+                }
                 // remove all
                 unRegisterUnusedAnimations(null, character.id);
 
-                // reached destination, resetting
+                // reached destination, reset dest
                 character.destX = null;
                 character.destY = null;
+            }
+
+            if (character.destX === character.startGridX && character.destY === character.startGridY) {
+
+                // going home, but will keep checking to see if I can reach player
+                if (directPath && directPath.length > 2) {
+
+                    if (directPath.length < character.lineOfSight) {
+
+                        // pop the last entry since that is player position and you don't want to overlap
+                        directPath.pop();
+
+                        // take the second entry since the first is the character position and that is already reached
+                        const nextDest = directPath[1];
+
+                        character.destX = nextDest[0];
+                        character.destY = nextDest[1];
+                    }
+                }
+
+
             }
         }
     });
@@ -791,12 +836,6 @@ const getCharacterForCurrentGridPosition = () => {
     const tileCoords = getTileCoordinates();
     const tileX = tileCoords[0];
     const tileY = tileCoords[1];
-
-    // for (let obj = 0; obj < tempCharacters.length; obj++) {
-    //     if (tempCharacters[obj].x === tileX && tempCharacters[obj].y === tileY ) {
-    //         return tempCharacters[obj];
-    //     }
-    // }
 
     for (let obj = 0; obj < tempCharacters.length; obj++) {
         if (helpers.Grid.xToGridX(tempCharacters[obj].x) === tileX &&
@@ -974,20 +1013,6 @@ const createPathfindingGrid = () => {
 
     // check characters
     for (let c = 0;c < tempCharacters.length; c ++) {
-
-    //     // block character position
-    //     let gridX = helpers.Grid.xToGridX(tempCharacters[c].x)
-    //     let gridY = helpers.Grid.yToGridY(tempCharacters[c].y)
-    //     internalGrid.setWalkableAt(gridX, gridY, false);
-    //
-    //     // block character destination
-    //     gridX = tempCharacters[c].destX;
-    //     gridY = tempCharacters[c].destY;
-    //
-    //     if (gridX && gridY) {
-    //         internalGrid.setWalkableAt(gridX, gridY, false);
-    //     }
-    // }
 
     // block current paths
         let x = helpers.Grid.xToGridX(tempCharacters[c].x)
