@@ -1,6 +1,7 @@
 import helpers from './helpers/index.js';
 
 import Structures from './constants/Structures.js';
+import CharacterTypes from './constants/CharacterTypes.js';
 
 let start = null;
 let progress = 0;
@@ -15,7 +16,7 @@ const innerMap = {
 
 const playerWidth = 50;
 const playerHeight = 50;
-const playerSpeed = 5;
+const playerSpeed = 3;
 
 const player = {
     x: 910,
@@ -39,6 +40,9 @@ const engine = {
         down: false
     }
 }
+
+// keep track of sprite sheet animations (player, enemies etc)
+const animations = [];
 
 // note the outside 4 grid units are not traversable, therefore its turned into water
 let area = [
@@ -74,11 +78,57 @@ let area = [
     [900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900,900]
 ];
 
+// all non-playing characters are stored here
+let characters = [
+    {
+        id: 100, // give each one a unique id. this is required for the animations
+        startGridX: 17,
+        startGridY: 6,
+        x: helpers.Grid.gridXtoX(17),
+        y: helpers.Grid.gridYtoY(6),
+        destX: null,
+        destY: null,
+        speed: 1,
+        handlePrefix: 'bandit_sheet',
+        handle: 'bandit_sheet_down',
+        type: CharacterTypes.ENEMY,
+        lineOfSight: 10
+    },
+    {
+        id: 101, // give each one a unique id. this is required for the animations
+        startGridX: 18,
+        startGridY: 6,
+        x: helpers.Grid.gridXtoX(18),
+        y: helpers.Grid.gridYtoY(6),
+        destX: null,
+        destY: null,
+        speed: 1,
+        handlePrefix: 'bandit_sheet',
+        handle: 'bandit_sheet_down',
+        type: CharacterTypes.ENEMY,
+        lineOfSight: 10
+    },
+    {
+        id: 102, // give each one a unique id. this is required for the animations
+        startGridX: 19,
+        startGridY: 6,
+        x: helpers.Grid.gridXtoX(19),
+        y: helpers.Grid.gridYtoY(6),
+        destX: null,
+        destY: null,
+        speed: 1,
+        handlePrefix: 'bandit_sheet',
+        handle: 'bandit_sheet_down',
+        type: CharacterTypes.ENEMY,
+        lineOfSight: 10
+    },
+];
+
 let objects = [
     {
         id: 100,
-        x: 7,
-        y: 7,
+        gridX: 7,
+        gridY: 7,
         handle: '103_rock_front_top_left',
         src: '/assets/objects/100_rock_a.png',
         img: new Image(),
@@ -87,7 +137,11 @@ let objects = [
     },
 ]
 
+// holds the reduced objects, only the ones that are (almost) in view
 let tempObjects = [];
+
+// holds the reduced characters, only the ones that are (almost) in view
+let tempCharacters = [];
 
 // set some vars that handle key mapping
 let KEYCODE_LEFT = 37,
@@ -104,18 +158,22 @@ const handleKeyDown = e => {
         case KEYCODE_LEFT:
             engine.keys.left = true;
             player.direction = 'left';
-            break;
-        case KEYCODE_UP:
-            engine.keys.up = true;
-            player.direction = 'up';
+            registerAnimation('hero_sheet_left', 1);
             break;
         case KEYCODE_RIGHT:
             engine.keys.right = true;
             player.direction = 'right';
+            registerAnimation('hero_sheet_right', 1);
+            break;
+        case KEYCODE_UP:
+            engine.keys.up = true;
+            player.direction = 'up';
+            registerAnimation('hero_sheet_up', 1);
             break;
         case KEYCODE_DOWN:
             engine.keys.down = true;
             player.direction = 'down';
+            registerAnimation('hero_sheet_down', 1);
             break;
     }
 }
@@ -124,15 +182,19 @@ const handleKeyUp = e => {
     switch (e.keyCode) {
         case KEYCODE_LEFT:
             engine.keys.left = false;
+            unRegisterAnimation( 'hero_sheet_left', 1);
             break;
         case KEYCODE_RIGHT:
             engine.keys.right = false;
+            unRegisterAnimation( 'hero_sheet_right', 1);
             break;
         case KEYCODE_UP:
             engine.keys.up = false;
+            unRegisterAnimation('hero_sheet_up', 1);
             break;
         case KEYCODE_DOWN:
             engine.keys.down = false;
+            unRegisterAnimation(  'hero_sheet_down', 1);
             break;
         case KEYCODE_DEBUG:
             engine.debug = engine.debug !== true;
@@ -150,91 +212,91 @@ const tiles = [
         img: new Image(),
         structure: Structures.BLOCK
     },
-     {
+    {
         id: 101,
         handle: '101_rock_front_bottom_center',
         src: '/assets/tiles/rock/101_rock_front_bottom_center.png',
         img: new Image(),
         structure: Structures.BLOCK
     },
-     {
+    {
         id: 102,
         handle: '102_rock_front_bottom_right',
         src: '/assets/tiles/rock/102_rock_front_bottom_right.png',
         img: new Image(),
         structure: Structures.BLOCK
     },
-     {
+    {
         id: 103,
         handle: '103_rock_front_top_left',
         src: '/assets/tiles/rock/103_rock_front_top_left.png',
         img: new Image(),
         structure: Structures.BLOCK
     },
-     {
+    {
         id: 104,
         handle: '104_rock_front_top_center',
         src: '/assets/tiles/rock/104_rock_front_top_center.png',
         img: new Image(),
         structure: Structures.BLOCK
     },
-     {
+    {
         id: 105,
         handle: '105_rock_front_top_right',
         src: '/assets/tiles/rock/105_rock_front_top_right.png',
         img: new Image(),
         structure: Structures.BLOCK
     },
-     {
+    {
         id: 106,
         handle: '106_rock_left_bottom',
         src: '/assets/tiles/rock/106_rock_left_bottom.png',
         img: new Image(),
         structure: Structures.BLOCK
     },
-     {
+    {
         id: 107,
         handle: '107_rock_center_bottom',
         src: '/assets/tiles/rock/107_rock_center_bottom.png',
         img: new Image(),
         structure: Structures.BLOCK
     },
-     {
+    {
         id: 108,
         handle: '108_rock_left_middle',
         src: '/assets/tiles/rock/108_rock_left_middle.png',
         img: new Image(),
         structure: Structures.BLOCK
     },
-     {
+    {
         id: 109,
         handle: '109_rock_right_bottom',
         src: '/assets/tiles/rock/109_rock_right_bottom.png',
         img: new Image(),
         structure: Structures.BLOCK
     },
-     {
+    {
         id: 110,
         handle: '110_rock_right_middle',
         src: '/assets/tiles/rock/110_rock_right_middle.png',
         img: new Image(),
         structure: Structures.BLOCK
     },
-     {
+    {
         id: 111,
         handle: '111_rock_left_top',
         src: '/assets/tiles/rock/111_rock_left_top.png',
         img: new Image(),
         structure: Structures.BLOCK
     },
-     {
+    {
         id: 112,
         handle: '112_rock_right_top',
         src: '/assets/tiles/rock/112_rock_right_top.png',
         img: new Image(),
         structure: Structures.BLOCK
     },
-     {
+    {
         id: 113,
         handle: '113_rock_entrance',
         src: '/assets/tiles/rock/113_rock_entrance.png',
@@ -275,22 +337,58 @@ const spriteSheets = [
     {
         handle: 'hero_sheet_left',
         src: '/assets/characters/hero/hero_sheet_left.png',
-        img: new Image()
+        img: new Image(),
+        timeOut: 100,
+        totalFrames: 8
     },
     {
         handle: 'hero_sheet_right',
         src: '/assets/characters/hero/hero_sheet_right.png',
-        img: new Image()
+        img: new Image(),
+        timeOut: 100,
+        totalFrames: 8
     },
     {
         handle: 'hero_sheet_up',
         src: '/assets/characters/hero/hero_sheet_up.png',
-        img: new Image()
+        img: new Image(),
+        timeOut: 100,
+        totalFrames: 8
     },
     {
         handle: 'hero_sheet_down',
         src: '/assets/characters/hero/hero_sheet_down.png',
-        img: new Image()
+        img: new Image(),
+        timeOut: 100,
+        totalFrames: 8
+    },
+    {
+        handle: 'bandit_sheet_left',
+        src: '/assets/characters/bandit/bandit_sheet_left.png',
+        img: new Image(),
+        timeOut: 100,
+        totalFrames: 8
+    },
+    {
+        handle: 'bandit_sheet_right',
+        src: '/assets/characters/bandit/bandit_sheet_right.png',
+        img: new Image(),
+        timeOut: 100,
+        totalFrames: 8
+    },
+    {
+        handle: 'bandit_sheet_up',
+        src: '/assets/characters/bandit/bandit_sheet_up.png',
+        img: new Image(),
+        timeOut: 100,
+        totalFrames: 8
+    },
+    {
+        handle: 'bandit_sheet_down',
+        src: '/assets/characters/bandit/bandit_sheet_down.png',
+        img: new Image(),
+        timeOut: 100,
+        totalFrames: 8
     }
 ]
 
@@ -302,19 +400,19 @@ const loadImage = image => {
     image['img'].src = image['src']
 }
 
-const areAllImageAssetsLoaded = () => {
+const checkLoadedAssets = () => {
     let loaded = true;
 
-    // check tiles
+    // check if tiles have dimensions (and are thus loaded)
     for (let loadedTile = 0; loadedTile < tiles.length; loadedTile++) {
         if (!tiles[loadedTile] || !tiles[loadedTile].img.naturalWidth) {
             loaded = false;
         }
     }
 
-    // check objects
-    for (let loadedObject = 0; objects < objects.length; objects++) {
-        if (!objects[objects] || !objects[objects].img.naturalWidth) {
+    // check if objects have dimensions (and are thus loaded)
+    for (let loadedObject = 0; loadedObject < objects.length; loadedObject++) {
+        if (!objects[loadedObject] || !objects[loadedObject].img.naturalWidth) {
             loaded = false;
         }
     }
@@ -323,7 +421,8 @@ const areAllImageAssetsLoaded = () => {
 }
 
 // returns the sprite identifier based on the direction of the player
-// todo: leverage this when dealing with npc's
+// todo: extend this when dealing with npc's
+// todo: rename prefix
 const getSpriteHandle = infix => {
     if (player.direction === 'left') { return `${infix}_left` }
     if (player.direction === 'right') { return `${infix}_right` }
@@ -333,19 +432,93 @@ const getSpriteHandle = infix => {
     return `${infix}_down`;
 }
 
+const updateAnimations = () => {
+    const now = Date.now();
+
+    animations.forEach(animation => {
+        if (now - animation.timeOut > animation.lastUpdate) {
+            animation.frame++;
+
+            if (animation.frame >= animation.totalFrames) {
+                animation.frame = 0;
+            }
+
+            animation.lastUpdate = now;
+        }
+    })
+}
+
+const getAnimationById = id => {
+    const animation = animations.filter(animation => animation.id === id);
+
+    if (animation && animation[0]) {
+        return animation[0];
+    }
+
+    return null;
+}
+
+const getSpriteSheetOffset = id => {
+    const animation = getAnimationById(id);
+
+    if (animation) {
+        return animation.frame
+    }
+
+    return 0;
+}
+
+// remove all spriteSheet handles from animations for given id, optionally except the given handle
+const unRegisterUnusedAnimations = (handle, id) => {
+    const spriteSheetsForId = animations.filter(animation => animation.id === id);
+
+    if (spriteSheetsForId && spriteSheetsForId.length) {
+        spriteSheetsForId.forEach(spriteSheet => {
+            if (!handle || (spriteSheet.handle !== handle)) {
+                unRegisterAnimation(spriteSheet.handle, spriteSheet.id);
+            }
+        })
+    }
+}
+
+const registerAnimation = (handle, id) => {
+    const spriteSheet = getSpriteSheetByHandle(handle);
+    const animation = getAnimationById(id);
+
+    if (!animation) {
+        animations.push(
+            {
+                id,
+                handle: handle,
+                frame: 0, // current frame
+                totalFrames: spriteSheet.totalFrames,
+                timeOut: spriteSheet.timeOut,
+                lastUpdate: 0, // timestamp
+            }
+        );
+    }
+}
+
+const unRegisterAnimation = (handle, id) => {
+    const animId = animations.findIndex(animation => animation.id === id && animation.handle === handle);
+
+    if (animId >= 0) {
+        animations.splice(animId, 1);
+    }
+}
+
 // draws the player on screen
 const drawPlayer = () => {
-    const sheetOffset = 0;
-    let sprite = getSpriteHandle('hero_sheet');
-
-    const imgData = getSpriteSheetByHandle(sprite).img;
+    const spriteHandle = getSpriteHandle('hero_sheet');
+    const imageObject = getSpriteSheetByHandle(spriteHandle);
+    let spriteSheetOffset = getSpriteSheetOffset(1); // hardcoded to have id 1
 
     context.save();
 
-    // move player to innerMap coordinates
+    // move context to match innerMap coordinates
     context.translate(innerMap.x, innerMap.y);
 
-    // manually tweak the positioning of the player sprite
+    // manually tweak the positioning of the player sprite so it becomes centered in relation to the tile
     const centeredX = -engine.tileWidth / 2;
     const centeredY = -engine.tileHeight / 2;
     context.translate(centeredX, centeredY);
@@ -353,8 +526,9 @@ const drawPlayer = () => {
     // ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, width, height);
     // only if you include all these params, are you able to clip the image. clip start is sx, sy, sWidth and sHeight determine
     // the clip dimensions, x, y set the starting position (upper-left corner) and width, height are the final sprite dimensions
-    context.drawImage(imgData, sheetOffset, 0, player.width, player.height, 0, 0, player.width, player.height);
+    context.drawImage(imageObject.img, spriteSheetOffset * 50, 0, player.width, player.height, 0, 0, player.width, player.height);
 
+    // show player hit box
     if (engine.debug) {
         context.strokeStyle = 'red';
         context.strokeRect(0, 0, 50, 50);
@@ -365,7 +539,7 @@ const drawPlayer = () => {
 
 const drawTileAt = (x, y, tileType) => {
     context.drawImage(tileType['img'], x, y, tileType['img'].width, tileType['img'].height);
-    context.strokeStyle='#000000';
+    context.strokeStyle = '#000000';
 
     if (engine.debug) {
         context.lineWidth = 1;
@@ -373,17 +547,16 @@ const drawTileAt = (x, y, tileType) => {
     }
 }
 
-// draw all tiles within range
+// draws all tiles within range
 const drawTiles = () => {
     for (let y = -engine.tileHeight; y < 800; y += engine.tileHeight) {
         for (let x = -engine.tileWidth; x < (800 + 2 * engine.tileWidth); x += engine.tileWidth) {
             const tileX = Math.floor((player.x + x - innerMap.x) / engine.tileWidth);
             const tileY = Math.floor((player.y + y - innerMap.y) / engine.tileHeight);
 
-            // todo: do programmatically
-            if (tileX < 0 || tileY < 0 || tileX > 29 || tileY > 29) {
+            if (tileX < 0 || tileY < 0 || tileX > (area[0].length - 1) || tileY > (area.length - 1)) {
 
-                // nothing to render here: at the edge of the map and trying to render out-of-bounds tile "off-screen"
+                // nothing to render here: at the edge of the map and trying to render a tile beyond the area limits
 
             } else {
                 const tileId = area[tileY][tileX];
@@ -435,42 +608,157 @@ const drawObjects = () => {
 
     // reduce objects collection
     tempObjects = objects.filter(obj =>
-        obj.x >= startGridX &&
-        obj.x <= endGridX &&
-        obj.y >= startGridY &&
-        obj.y <= endGridY);
+        obj.gridX >= startGridX &&
+        obj.gridX <= endGridX &&
+        obj.gridY >= startGridY &&
+        obj.gridY <= endGridY);
 
     // draw objects
     tempObjects.forEach(obj => {
         context.drawImage(
             obj.img,
-            (obj.x * engine.tileWidth) - player.x + innerMap.x,
-            (obj.y * engine.tileHeight) - player.y + innerMap.y,
+            (obj.gridX * engine.tileWidth) - player.x + innerMap.x,
+            (obj.gridY * engine.tileHeight) - player.y + innerMap.y,
             obj['img'].width,
             obj['img'].height
         );
     });
 }
 
+// draws all characters within range
+const drawCharacters = () => {
+
+    // determine range
+    let startX = Math.floor((player.x - innerMap.x - 100));
+    let endX = Math.floor((player.x + 900 - innerMap.x));
+    let startY = Math.floor((player.y - innerMap.y - 100));
+    let endY = Math.floor((player.y + 800 - innerMap.y));
+
+    tempCharacters = characters.filter(char =>
+        char.x >= startX &&
+        char.x <= endX &&
+        char.y >= startY &&
+        char.y <= endY);
+
+    // draw characters
+    tempCharacters.forEach(char => {
+        let spriteSheetOffset = getSpriteSheetOffset(char.id);
+
+        // unlike objects, the characters are animated and its image object resides therefore not in the main characters
+        // nor the tempCharacters, but the image collection
+        const imgData = getSpriteSheetByHandle(char.handle);
+
+        context.drawImage(
+            imgData.img,
+            spriteSheetOffset * 50,
+            0,
+            50, // fixed for now
+            50, // fixed for now
+            char.x - player.x + innerMap.x,
+            char.y - player.y + innerMap.y,
+            50,
+            50
+        );
+    });
+}
+
+const moveCharacters = () => {
+
+    // work solely with tempCharacters which is already limited to characters that are (almost) on screen
+    tempCharacters.forEach(character => {
+
+        // you need to reinstantiate the grid for each call! see https://github.com/qiao/PathFinding.js/issues/109
+        const grid = createPathfindingGrid();
+
+        // if no destination set recalculate path to player
+        if (!character.destX || !character.destY) {
+
+            // char has no destX,destY, calculating path to player
+            const directPath = finder.findPath(
+                helpers.Grid.xToGridX(character.x),
+                helpers.Grid.yToGridY(character.y),
+                helpers.Grid.xToGridX(player.x),
+                helpers.Grid.yToGridY(player.y),
+                grid // note the grid is not checking for characters since they are dynamic resulting in expensive recalculations
+            );
+
+            if (directPath && directPath.length > 2) {
+
+                if (directPath.length < character.lineOfSight) {
+
+                    // pop the last entry since that is player position and you dont want overlap
+                    directPath.pop();
+
+                    // take the second entry since the first is the character position and that is already reached
+                    const nextDest = directPath[1];
+
+                    character.destX = nextDest[0];
+                    character.destY = nextDest[1];
+                } else {
+                    // player is too far away, move back to starting position
+                    character.destX = character.startGridX;
+                    character.destY = character.startGridY;
+                }
+            }
+        } else {
+            const speed = character.speed;
+            const destX = character.destX;
+            const destY = character.destY;
+
+            if (character.x < helpers.Grid.gridXtoX(destX)) {
+                character.x += speed;
+                character.handle=`${character.handlePrefix}_right`;
+                unRegisterUnusedAnimations(character.handle, character.id);
+                registerAnimation(`${character.handlePrefix}_right`, character.id);
+                if (character.x > helpers.Grid.gridXtoX(destX)) { character.x = helpers.Grid.gridXtoX(destX)}
+            } else if (character.x > helpers.Grid.gridXtoX(destX)) {
+                character.x -= speed;
+                character.handle=`${character.handlePrefix}_left`;
+                unRegisterUnusedAnimations(character.handle, character.id);
+                registerAnimation(`${character.handlePrefix}_left`, character.id);
+                if (character.x < helpers.Grid.gridXtoX(destX)) { character.x = helpers.Grid.gridXtoX(destX)}
+            } else if (character.y < helpers.Grid.gridYtoY(destY)) {
+                character.y += speed;
+                character.handle=`${character.handlePrefix}_down`;
+                unRegisterUnusedAnimations(character.handle, character.id);
+                registerAnimation(`${character.handlePrefix}_down`, character.id);
+                if (character.y > helpers.Grid.gridYtoY(destY)) { character.y = helpers.Grid.gridYtoY(destY)}
+            } else if (character.y > helpers.Grid.gridYtoY(destY)) {
+                character.y -= speed;
+                character.handle=`${character.handlePrefix}_up`;
+                unRegisterUnusedAnimations(character.handle, character.id);
+                registerAnimation(`${character.handlePrefix}_up`, character.id);
+                if (character.y < helpers.Grid.gridYtoY(destY)) { character.y = helpers.Grid.gridYtoY(destY)}
+            }
+
+            if (character.x === helpers.Grid.gridXtoX(destX) && character.y === helpers.Grid.gridYtoY(destY)) {
+
+                // remove all
+                unRegisterUnusedAnimations(null, character.id);
+
+                // reached destination, resetting
+                character.destX = null;
+                character.destY = null;
+            }
+        }
+    });
+}
+
 // returns tile instance for given id
 const getTileById = id => {
+    const tile = tiles.filter(tile => tile.id === id);
 
-    // todo: what ugly lookup is this?! fix it!
-    for (let tile = 0; tile < tiles.length; tile++) {
-        if (tiles[tile]['id'] === id) {
-            return tiles[tile];
-        }
+    if (tile && tile[0]) {
+        return tile[0];
     }
 }
 
 // returns sprite sheet instance for given handle
 const getSpriteSheetByHandle = handle => {
+    const spriteSheet = spriteSheets.filter(spriteSheet => spriteSheet.handle === handle);
 
-    // todo: what ugly lookup is this?! fix it!
-    for (let spriteSheet = 0; spriteSheet < spriteSheets.length; spriteSheet++) {
-        if (spriteSheets[spriteSheet]['handle'] === handle) {
-            return spriteSheets[spriteSheet];
-        }
+    if (spriteSheet && spriteSheet[0]) {
+        return spriteSheet[0];
     }
 }
 
@@ -490,7 +778,7 @@ const getObjectForCurrentGridPosition = () => {
     const tileY = tileCoords[1];
 
     for (let obj = 0; obj < tempObjects.length; obj++) {
-        if (tempObjects[obj].x === tileX && tempObjects[obj].y === tileY ) {
+        if (tempObjects[obj].gridX === tileX && tempObjects[obj].gridY === tileY ) {
             return tempObjects[obj];
         }
     }
@@ -498,11 +786,33 @@ const getObjectForCurrentGridPosition = () => {
     return null;
 }
 
+// returns character instance for grid x, y (if it exists)
+const getCharacterForCurrentGridPosition = () => {
+    const tileCoords = getTileCoordinates();
+    const tileX = tileCoords[0];
+    const tileY = tileCoords[1];
+
+    // for (let obj = 0; obj < tempCharacters.length; obj++) {
+    //     if (tempCharacters[obj].x === tileX && tempCharacters[obj].y === tileY ) {
+    //         return tempCharacters[obj];
+    //     }
+    // }
+
+    for (let obj = 0; obj < tempCharacters.length; obj++) {
+        if (helpers.Grid.xToGridX(tempCharacters[obj].x) === tileX &&
+            helpers.Grid.yToGridY(tempCharacters[obj].y) === tileY) {
+            return tempCharacters[obj];
+        }
+    }
+
+    return null;
+}
+
 const movePlayer = () => {
-    const currentX = player.x;
-    const currentY = player.y;
-    const currentInnerMapX = innerMap.x;
-    const currentInnerMapY = innerMap.y;
+    const oldX = player.x;
+    const oldY = player.y;
+    const oldInnerMapX = innerMap.x;
+    const oldInnerMapY = innerMap.y;
     const speed = player.speed;
 
     // the outerMap dimensions are as wide as the defined area (array) minus an offset to ensure screen is always filled up with grid
@@ -534,11 +844,12 @@ const movePlayer = () => {
     }
 
     // deal with tiles and objects, handing over the old position coordinates in case player moved to invalid tile or location
-    handleTileCollision(currentX, currentY, currentInnerMapX, currentInnerMapY);
-    handleObjectCollision(currentX, currentY, currentInnerMapX, currentInnerMapY);
+    handleTileCollision(oldX, oldY, oldInnerMapX, oldInnerMapY);
+    handleObjectCollision(oldX, oldY, oldInnerMapX, oldInnerMapY);
+    handleCharacterCollision(oldX, oldY, oldInnerMapX, oldInnerMapY);
 }
 
-const handleTileCollision = (currentX, currentY, currentInnerMapX, currentInnerMapY) => {
+const handleTileCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
     const tileType = getTileForCurrentGridPosition();
 
     // player moves through liquid
@@ -553,27 +864,40 @@ const handleTileCollision = (currentX, currentY, currentInnerMapX, currentInnerM
     if (tileType.structure === Structures.BLOCK) {
 
         // reset due to obstacle
-        player.x = currentX;
-        player.y = currentY;
-        innerMap.x = currentInnerMapX;
-        innerMap.y = currentInnerMapY;
+        player.x = oldX;
+        player.y = oldY;
+        innerMap.x = oldInnerMapX;
+        innerMap.y = oldInnerMapY;
     } else {
-        // deal with other types of tile Structures like water fire snow etc
+        // deal with other types of tile Structures like mud, fire, snow, locked doors etc
     }
 }
 
-const handleObjectCollision = (currentX, currentY, currentInnerMapX, currentInnerMapY) => {
+const handleObjectCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
     let currentObject = getObjectForCurrentGridPosition();
 
     if (currentObject && currentObject.structure === Structures.BLOCK) {
 
         // reset due to obstacle
-        player.x = currentX;
-        player.y = currentY;
-        innerMap.x = currentInnerMapX;
-        innerMap.y = currentInnerMapY;
+        player.x = oldX;
+        player.y = oldY;
+        innerMap.x = oldInnerMapX;
+        innerMap.y = oldInnerMapY;
     } else {
         // deal with other types of object Structures like pick-ups, death traps etc.
+    }
+}
+
+const handleCharacterCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
+    let currentCharacter = getCharacterForCurrentGridPosition();
+
+    if (currentCharacter) {
+
+        // reset due to obstacle
+        player.x = oldX;
+        player.y = oldY;
+        innerMap.x = oldInnerMapX;
+        innerMap.y = oldInnerMapY;
     }
 }
 
@@ -582,35 +906,28 @@ const updateCanvas = timestamp => {
 
     if (assetsLoaded) {
         movePlayer();
+        moveCharacters();
+        updateAnimations();
         drawTiles();
         drawObjects();
+        drawCharacters();
         drawPlayer();
 
-        if (engine.rasterLines) {
-            helpers.Canvas.rasterLines(context);
-        }
+        if (engine.rasterLines) { helpers.Canvas.rasterLines(context) }
 
         if (engine.debug) {
-            const now = performance.now();
-
-            while (engine.fpsTimer.length > 0 && engine.fpsTimer[0] <= now - 1000) {
-                engine.fpsTimer.shift();
-            }
-
-            engine.fpsTimer.push(now);
-
             const debugElem = document.querySelector('#debug');
+            const now = performance.now();
+            const coords = getTileCoordinates();
 
-            if (debugElem) {
-                const coords = getTileCoordinates();
-
-                debugElem.innerHTML = `playerX: ${player.x} innerMapX: ${innerMap.x} gridX: ${coords[0]} playerY: ${player.y} innerMapY:${innerMap.y} gridY: ${coords[1]} fps: ${engine.fpsTimer.length}`;
-            }
+            while (engine.fpsTimer.length > 0 && engine.fpsTimer[0] <= now - 1000) { engine.fpsTimer.shift() }
+            engine.fpsTimer.push(now);
+            if (debugElem) { debugElem.innerHTML = `playerX: ${player.x} innerMapX: ${innerMap.x} gridX: ${coords[0]} playerY: ${player.y} innerMapY:${innerMap.y} gridY: ${coords[1]} fps: ${engine.fpsTimer.length}` }
         }
     }
 
     if (!assetsLoaded) {
-        if (areAllImageAssetsLoaded()) {
+        if (checkLoadedAssets()) {
             assetsLoaded = true;
         }
 
@@ -620,33 +937,77 @@ const updateCanvas = timestamp => {
         context.fillText("loading", (800 / 2) - (context.measureText("loading").width / 2), 250);
     }
 
-    if (!start) {
-        start = timestamp
-    }
-
+    if (!start) { start = timestamp }
     progress = timestamp - start;
+    if (progress < 1000) { start = null }
 
-    if (progress < 1000) {
-        start = null;
-    }
-
+    // re-trigger update function
     setTimeout(updateCanvas, 15); // 15ms is about 60fps. despite what I've always said: do not use requestAnimationFrame!
 }
 
-// call the loadImage function for each defined image
-tiles.map(image => {
-    loadImage(image);
-});
+// initialise the images in tiles, spriteSheets and objects by loading the bitmap data into the placeholder objects
+tiles.map(image => { loadImage(image) });
+spriteSheets.map(image => { loadImage(image) });
+objects.map(object => { loadImage(object) });
 
-spriteSheets.map(image => {
-    loadImage(image);
-});
+const createPathfindingGrid = () => {
 
-objects.map(object => {
-    loadImage(object);
-});
+    // 'PF' will be initialised at runtime due to html include. also note the parameters are x,y hence the [0] for x
+    let internalGrid = new PF.Grid(area[0].length, area.length);
 
-// disable page movement using cursor keys
+    for (let a = 0; a < area.length; a ++) {
+        for (let b = 0; b < area[a].length; b ++) {
+            if (area[a][b] < 901 ) {
+
+                // found non-traversable tile (basically everything under 901)
+                internalGrid.setWalkableAt(b, a, false);
+            }
+        }
+    }
+
+    // check objects
+    for (let c = 0;c < tempObjects.length; c ++) {
+        let x = tempObjects[c].gridX;
+        let y = tempObjects[c].gridY;
+        internalGrid.setWalkableAt(x, y, false);
+    }
+
+    // check characters
+    for (let c = 0;c < tempCharacters.length; c ++) {
+
+    //     // block character position
+    //     let gridX = helpers.Grid.xToGridX(tempCharacters[c].x)
+    //     let gridY = helpers.Grid.yToGridY(tempCharacters[c].y)
+    //     internalGrid.setWalkableAt(gridX, gridY, false);
+    //
+    //     // block character destination
+    //     gridX = tempCharacters[c].destX;
+    //     gridY = tempCharacters[c].destY;
+    //
+    //     if (gridX && gridY) {
+    //         internalGrid.setWalkableAt(gridX, gridY, false);
+    //     }
+    // }
+
+    // block current paths
+        let x = helpers.Grid.xToGridX(tempCharacters[c].x)
+        let y = helpers.Grid.yToGridY(tempCharacters[c].y)
+        internalGrid.setWalkableAt(x, y, false);
+
+        // also block destination paths
+        x = tempCharacters[c].destX;
+        y = tempCharacters[c].destY;
+
+        if (x && y) {
+            internalGrid.setWalkableAt(x, y, false);
+        }
+    }
+    return internalGrid;
+}
+
+const finder = new PF.DijkstraFinder();
+
+// disable page movement when using the cursor keys
 window.addEventListener('keydown', e => {
     if ([37, 38, 39, 40, 65, 68, 73, 77, 83, 84, 87].indexOf(e.keyCode) > -1) {
         e.preventDefault();
@@ -660,5 +1021,5 @@ document.onkeyup = handleKeyUp;
 // register global window event listener for click events
 window.addEventListener('click', clickHandler);
 
-// trigger update function
+// trigger update function once
 setTimeout(updateCanvas, 0);
