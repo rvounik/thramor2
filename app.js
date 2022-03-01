@@ -996,7 +996,7 @@ const createPathfindingGrid = () => {
 
     for (let a = 0; a < area.length; a ++) {
         for (let b = 0; b < area[a].length; b ++) {
-            if (area[a][b] < 901 ) {
+            if (area[a][b] < 901 || area[a][b] === 903) {
 
                 // found non-traversable tile (basically everything under 901)
                 internalGrid.setWalkableAt(b, a, false);
