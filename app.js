@@ -11,6 +11,7 @@ import spriteSheets from './assets/data/spriteSheets.js';
 
 // constants
 import Structures from './constants/Structures.js';
+import Effects from './constants/Effects.js';
 
 let start = null;
 let progress = 0;
@@ -53,7 +54,8 @@ const engine = {
 // keep track of sprite sheet animations (player, enemies etc)
 const animations = [];
 
-let hitAnimations = [];
+// objects defining graphical effects
+const effects = [];
 
 // holds the reduced objects, only the ones that are (almost) in view
 let tempObjects = []; // todo: rename visibleObjects?
@@ -170,6 +172,7 @@ const updateAnimations = () => {
                 }
             }
 
+
             animation.lastUpdate = now;
         }
     })
@@ -179,6 +182,7 @@ const registerAnimation = (handle, characterId, options) => {
     const spriteSheet = helpers.SpriteSheet.getSpriteSheetByHandle(handle, spriteSheets);
     const animation = helpers.Animation.getAnimationById(characterId, animations);
 
+    // only push if it did not exist already, or it will keep repeating the first frame
     if (!animation) {
         animations.push(
             {
@@ -188,7 +192,7 @@ const registerAnimation = (handle, characterId, options) => {
                 startFrame: spriteSheet.startFrame,
                 endFrame: spriteSheet.endFrame,
                 timeOut: spriteSheet.timeOut,
-                lastUpdate: 0, // timestamp
+                lastUpdate: 0,
                 ...options
             }
         );
@@ -223,7 +227,7 @@ const drawPlayer = () => {
     // move context to match innerMap coordinates
     context.translate(innerMap.x, innerMap.y);
 
-    // manually tweak the positioning of the player sprite so it becomes centered in relation to the tile
+    // manually tweak the positioning of the player sprite, so it becomes centered in relation to the tile
     const centeredX = -engine.tileWidth / 2;
     const centeredY = -engine.tileHeight / 2;
     context.translate(centeredX, centeredY);
@@ -241,7 +245,6 @@ const drawPlayer = () => {
 
     context.restore();
 }
-
 
 // draws all tiles within range
 const drawTiles = () => {
@@ -328,7 +331,7 @@ const getPathToPlayer = character => {
 }
 
 // draws all characters within range
-const drawCharacters = () => {
+const drawCharacters = (mode) => {
 
     // determine range
     let startX = Math.floor((player.x - innerMap.x - 100));
@@ -344,23 +347,37 @@ const drawCharacters = () => {
 
     // draw characters
     tempCharacters.forEach(char => {
-        let spriteSheetOffset = helpers.Animation.getAnimationOffset(char.id, animations);
+        const spriteSheetOffset = helpers.Animation.getAnimationOffset(char.id, animations);
+        const imgData = helpers.SpriteSheet.getSpriteSheetByHandle(char.handle, spriteSheets);
+        const yPos = char.y - player.y + innerMap.y;
 
-        // unlike objects, the characters are animated and its image object resides therefore not in the main characters
-        // nor the tempCharacters, but the image collection
-        let imgData = helpers.SpriteSheet.getSpriteSheetByHandle(char.handle, spriteSheets);
+        if (mode === 'under' && yPos <= innerMap.y) {
+            context.drawImage(
+                imgData.img,
+                (spriteSheetOffset * 50),
+                0,
+                50, // fixed for now
+                50, // fixed for now
+                char.x - player.x + innerMap.x,
+                yPos,
+                50,
+                50
+            );
+        }
 
-        context.drawImage(
-            imgData.img,
-            (spriteSheetOffset * 50),
-            0,
-            50, // fixed for now
-            50, // fixed for now
-            char.x - player.x + innerMap.x,
-            char.y - player.y + innerMap.y,
-            50,
-            50
-        );
+        if (mode === 'over' && yPos > innerMap.y) {
+            context.drawImage(
+                imgData.img,
+                (spriteSheetOffset * 50),
+                0,
+                50, // fixed for now
+                50, // fixed for now
+                char.x - player.x + innerMap.x,
+                yPos,
+                50,
+                50
+            );
+        }
     });
 }
 
@@ -372,6 +389,8 @@ const moveCharacters = () => {
 
         if (!character.destX || !character.destY) {
             if (directPath && directPath.length > 2) {
+
+                character.attackTimer = 0;
 
                 // if within range, skip first (own position) and last (player position) and set it as new destination
                 if (directPath.length < character.lineOfSight) {
@@ -387,14 +406,29 @@ const moveCharacters = () => {
                 }
             } else {
 
+                // path too short, too close to player, depleting timer
+                if (character.attackInterval) {
+                    character.attackTimer++;
+
+                    if (character.attackTimer >= character.attackInterval) {
+                        character.attackTimer = 0;
+
+                        if (withinAttackRange(character)) {
+                            const characterInstance = helpers.Character.getCharacterById(character.id, characters);
+
+                            attackPlayer(characterInstance);
+                        }
+                    }
+                }
+
                 // rotate towards player
                 character.handle = helpers.Character.getOrientatedCharacterHandle(character, player);
-
             }
         } else {
             const speed = character.speed;
             const destX = character.destX;
             const destY = character.destY;
+
 
             // move character towards destination, preventing overflow, and using the correctly orientated spriteSheet
             if (character.x < helpers.Grid.gridXtoX(destX)) {
@@ -443,11 +477,10 @@ const moveCharacters = () => {
                     character.destX = null;
                     character.destY = null;
 
-                    // check if within attack range, if so, call attack helper function
-                    const path = getPathToPlayer(character);
+                    if (withinAttackRange(character)) {
+                        const characterInstance = helpers.Character.getCharacterById(character.id, characters);
 
-                    if (path && path.length > 0 && path.length <= 2) {
-                        attackPlayer(character);
+                        attackPlayer(characterInstance);
                     }
                 }
             }
@@ -469,55 +502,95 @@ const moveCharacters = () => {
     });
 }
 
-const checkAttackRange = (id, characterId) => {
-    const character = helpers.Character.getCharacterById(characterId, characters)
+const withinAttackRange = character => {
     const path = getPathToPlayer(character);
 
-    if (path && path.length <= 2 && path.length > 0) {
-
-        // re-register attack since still in range
-        attackPlayer(character);
-    }
+    return path && path.length <= 2 && path.length > 0;
 }
 
 const attackPlayer = character => {
+    const characterInstance = helpers.Character.getCharacterById(character.id, characters);
+
     registerAnimation(
         character.handle,
         character.id,
         {
             startFrame: 8,
-            frame: 8, // also set frame so it begins at this
+            frame: 8, // override current frame
             endFrame: 12,
             callback: id => {
+
+                // remove this animation instance after it has finished playing
                 helpers.Animation.unRegisterAnimation(id, animations);
-                checkAttackRange(id, character.id);
             }
         });
 
-    createHitAnimation(player.x, player.y)
+    playSound('assets/sounds/sword.wav');
+    playSound('assets/sounds/coins.wav');
+
+    helpers.Effect.createCloud(
+    innerMap.x,
+    innerMap.y,
+        '#ccccff',
+        effects
+    );
+
+    helpers.Effect.createSparks(
+    innerMap.x,
+    -15,
+    innerMap.y,
+        '#ffd700',
+        effects
+    );
 }
 
-const createHitAnimation = (x, y) => {
-    const xPos = x - player.x + innerMap.x - 25;
-    const yPos = y - player.y + innerMap.y - 25;
+const drawEffects = (mode) => {
+    effects.forEach((effect, index) => {
+        switch (effect.type) {
+            case Effects.SMOKE:
+                if (mode === 'over') { // todo: let the effect itself determine whether its over or under
+                    context.save();
+                    context.globalAlpha = .4;
+                    context.beginPath();
+                    context.arc(effect.x, effect.y, effect.radius, 0, 2 * Math.PI, false);
+                    context.fillStyle = effect.color;
+                    context.fill();
+                    context.restore();
 
-    hitAnimations.push({
-        x: xPos,
-        y: yPos,
-        timer: 0
-    })
-}
+                    effect.counter++;
+                    effect.radius > 1 && effect.radius--;
+                    effect.y -= (25 - effect.radius) / 5;
 
-const drawHitAnimations = () => {
-    hitAnimations.forEach((hitAnimation, index) => {
-        context.fillStyle = "#ff0000";
-        context.fillRect(hitAnimation.x, hitAnimation.y, 50/hitAnimation.timer, 50/hitAnimation.timer);
-        hitAnimation.timer++;
+                    if (effect.counter > 35) {
+                        effects.splice(index, 1);
+                    }
+                }
+                break;
+            case Effects.SPARKS:
+                if (mode==='under') {// todo: let the effect itself determine whether its over or under
+                    context.save();
+                    context.beginPath();
+                    context.fillStyle = effect.color;
+                    context.arc(effect.x < innerMap.x ? effect.x -= 1.8 / effect.counter : effect.x += 1.8 / effect.counter, effect.startY - effect.y, effect.radius, 0, 2 * Math.PI, false);
+                    context.fill();
+                    context.strokeStyle= '#8F7900';
+                    context.stroke();
+                    // context.fillRect(effect.x < innerMap.x ? effect.x -= .8 / effect.counter : effect.x += .8 / effect.counter, effect.startY - effect.y, effect.radius, effect.radius);
+                    context.globalAlpha = .4;
+                    context.restore();
 
-        if (hitAnimation.timer > 10) {
-            hitAnimations.splice(index, 1);
+                    effect.counter += 0.2;
+                    effect.y += (((6 - effect.counter) * Math.sin(effect.counter)) / 2);
+
+                    if (effect.counter >= 2.6 * Math.PI) {
+                        effects.splice(index, 1);
+                    }
+                }
+                break;
+            default:
+                break;
         }
-    })
+    });
 }
 
 const movePlayer = () => {
@@ -613,6 +686,12 @@ const handleCharacterCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
     }
 }
 
+const playSound = sound => {
+    let audio = new Audio();
+    audio.src = sound;
+    audio.play();
+}
+
 const updateCanvas = timestamp => {
     helpers.Canvas.clearCanvas(context);
 
@@ -622,9 +701,11 @@ const updateCanvas = timestamp => {
         updateAnimations();
         drawTiles();
         drawObjects();
-        drawCharacters();
+        drawEffects('under');
+        drawCharacters('under');
         drawPlayer();
-        drawHitAnimations();
+        drawCharacters('over');
+        drawEffects('over');
 
         if (engine.rasterLines) { helpers.Canvas.rasterLines(context) }
 

@@ -15,7 +15,9 @@ const Characters = [
         handle: 'bandit_sheet_down',
         handle_attacking: 'bandit_sheet_attack_down',
         type: CharacterTypes.ENEMY,
-        lineOfSight: 10
+        lineOfSight: 10,
+        attackInterval: 100, // timeout in ticks
+        attackTimer: 0
     },
     {
         id: 101, // give each one a unique id. this is required for the animations
@@ -29,7 +31,9 @@ const Characters = [
         handlePrefix: 'bandit_sheet',
         handle: 'bandit_sheet_down',
         type: CharacterTypes.ENEMY,
-        lineOfSight: 10
+        lineOfSight: 10,
+        attackInterval: 100, // timeout in ticks
+        attackTimer: 0
     },
     {
         id: 102, // give each one a unique id. this is required for the animations
@@ -43,7 +47,9 @@ const Characters = [
         handlePrefix: 'bandit_sheet',
         handle: 'bandit_sheet_down',
         type: CharacterTypes.ENEMY,
-        lineOfSight: 10
+        lineOfSight: 10,
+        attackInterval: 100, // timeout in ticks
+        attackTimer: 0
     },
 ];
 
