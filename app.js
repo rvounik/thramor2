@@ -35,6 +35,8 @@ const player = {
     width: playerWidth,
     height: playerHeight,
     direction: 'down',
+    attacking: false,
+    strength: 10
 }
 
 const engine = {
@@ -68,6 +70,7 @@ let KEYCODE_LEFT = 37,
     KEYCODE_UP = 38,
     KEYCODE_RIGHT = 39,
     KEYCODE_DOWN = 40,
+    KEYCODE_SPACE = 32,
     KEYCODE_DEBUG = 68;
 
 // get the canvas context
@@ -100,10 +103,41 @@ const handleKeyDown = e => {
             player.direction = 'down';
             registerAnimation('hero_sheet_down', 1);
             break;
+        case KEYCODE_SPACE:
+            if (!player.attacking) {
+
+                // stop walking animation
+                helpers.Animation.unRegisterAnimation(1, animations);
+
+                // set flag so you cannot attack when already doing so
+                player.attacking = true;
+
+                registerAnimation(
+                    `hero_sheet_${player.direction}`,
+                    1, // hardcoded for 1, which is player
+                    {
+                        startFrame: 8,
+                        frame: 8, // override current frame
+                        endFrame: 12,
+                        callback: id => {
+                            handleAfterAttack(id);
+                        }
+                    });
+
+                helpers.Sound.playSound('assets/sounds/swish.wav');
+            }
+
+            break;
     }
 }
 
 const handleKeyUp = e => {
+    if (player.attacking) {
+
+        // ensure the attack anim has fully played before player can switch direction
+        return false;
+    }
+
     switch (e.keyCode) {
         case KEYCODE_LEFT:
             engine.keys.left = false;
@@ -157,6 +191,43 @@ const checkLoadedAssets = () => {
     return loaded;
 }
 
+const handleAfterAttack = id => {
+    // remove this animation instance after it has finished playing
+    helpers.Animation.unRegisterAnimation(id, animations);
+
+    // reset the flag so you can attack again
+    player.attacking = false;
+
+    let char = null;
+
+    if (player.direction === 'right') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x) + 1, helpers.Grid.yToGridY(player.y), tempCharacters); }
+    if (player.direction === 'left') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x) - 1, helpers.Grid.yToGridY(player.y), tempCharacters);}
+    if (player.direction === 'up') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x), helpers.Grid.yToGridY(player.y) -1, tempCharacters); }
+    if (player.direction === 'down') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x), helpers.Grid.yToGridY(player.y) +1, tempCharacters); }
+
+    if (char) {
+        char.health -= player.strength;
+
+        if (char.health < 0) {
+
+            // note by default placing things on a canvas grid has the center point in the upper-left corner
+            // the player sprite is corrected for this, characters are not (will cause all sorts of glitches)
+            // to fix, manually add half a tile when placing effects on characters
+            helpers.Effect.createSmoke(
+                char.x + 25,
+                char.y + 25,
+                '#000000',
+                { x: char.x + 25, y: char.y + 25 },
+                effects
+            );
+
+            helpers.Character.removeCharacterById(char.id, characters);
+
+            // todo: leave coin behind
+        }
+    }
+}
+
 const updateAnimations = () => {
     const now = Date.now();
 
@@ -171,7 +242,6 @@ const updateAnimations = () => {
                     animation.callback(animation.id, animation.id);
                 }
             }
-
 
             animation.lastUpdate = now;
         }
@@ -220,7 +290,7 @@ const drawPlayer = () => {
     }
 
     const imageObject = helpers.SpriteSheet.getSpriteSheetByHandle(spriteHandle, spriteSheets);
-    const animationOffset = helpers.Animation.getAnimationOffset(1, animations); // hardcoded for 1, which is player
+    let animationOffset = helpers.Animation.getAnimationOffset(1, animations); // hardcoded for 1, which is player
 
     context.save();
 
@@ -390,7 +460,8 @@ const moveCharacters = () => {
         if (!character.destX || !character.destY) {
             if (directPath && directPath.length > 2) {
 
-                character.attackTimer = 0;
+                // half this when moving so characters wont attack players the second they reach their destination (unfair)
+                character.attackTimer = 75;
 
                 // if within range, skip first (own position) and last (player position) and set it as new destination
                 if (directPath.length < character.lineOfSight) {
@@ -406,18 +477,16 @@ const moveCharacters = () => {
                 }
             } else {
 
-                // path too short, too close to player, depleting timer
-                if (character.attackInterval) {
-                    character.attackTimer++;
+                // path too short, too close to player, starting timer
 
-                    if (character.attackTimer >= character.attackInterval) {
-                        character.attackTimer = 0;
+                character.attackTimer++;
 
-                        if (withinAttackRange(character)) {
-                            const characterInstance = helpers.Character.getCharacterById(character.id, characters);
+                if (character.attackTimer >= character.attackInterval) {
 
-                            attackPlayer(characterInstance);
-                        }
+                    character.attackTimer = 0;
+
+                    if (withinAttackRange(character)) {
+                        attackPlayer(helpers.Character.getCharacterById(character.id, characters));
                     }
                 }
 
@@ -429,6 +498,8 @@ const moveCharacters = () => {
             const destX = character.destX;
             const destY = character.destY;
 
+            // half this when moving so characters wont attack players the second they reach their destination (unfair)
+            character.attackTimer = 75;
 
             // move character towards destination, preventing overflow, and using the correctly orientated spriteSheet
             if (character.x < helpers.Grid.gridXtoX(destX)) {
@@ -467,20 +538,17 @@ const moveCharacters = () => {
             if (character.x === helpers.Grid.gridXtoX(destX) && character.y === helpers.Grid.gridYtoY(destY)) {
                 helpers.Animation.unRegisterUnusedAnimations(null, character.id, animations);
 
-                // prevent moving to the exact tile the player is at
-                if (helpers.Grid.xToGridX(character.x) === helpers.Grid.xToGridX(player.x) && helpers.Grid.yToGridY(character.y) === helpers.Grid.yToGridY(player.y)) {
-                    character.destX = character.startGridX;
-                    character.destY = character.startGridY;
-                } else {
+                // destination is reached: clear destination coordinates
+                character.destX = null;
+                character.destY = null;
 
-                    // destination is reached: clear destination coordinates
-                    character.destX = null;
-                    character.destY = null;
+                character.attackTimer++;
+
+                if (character.attackTimer >= character.attackInterval) {
+                    character.attackTimer = 0;
 
                     if (withinAttackRange(character)) {
-                        const characterInstance = helpers.Character.getCharacterById(character.id, characters);
-
-                        attackPlayer(characterInstance);
+                        attackPlayer(helpers.Character.getCharacterById(character.id, characters));
                     }
                 }
             }
@@ -509,8 +577,6 @@ const withinAttackRange = character => {
 }
 
 const attackPlayer = character => {
-    const characterInstance = helpers.Character.getCharacterById(character.id, characters);
-
     registerAnimation(
         character.handle,
         character.id,
@@ -525,34 +591,43 @@ const attackPlayer = character => {
             }
         });
 
-    playSound('assets/sounds/sword.wav');
-    playSound('assets/sounds/coins.wav');
+    helpers.Sound.playSound('assets/sounds/sword.wav');
+    helpers.Sound.playSound('assets/sounds/coins.wav');
 
-    helpers.Effect.createCloud(
+    helpers.Effect.createSmoke(
     innerMap.x,
     innerMap.y,
         '#ccccff',
+        player,
         effects
     );
 
-    helpers.Effect.createSparks(
-    innerMap.x,
-    -15,
-    innerMap.y,
-        '#ffd700',
+    helpers.Effect.createCoins(
+        innerMap.x,
+        innerMap.y,
+        player,
         effects
     );
 }
 
 const drawEffects = (mode) => {
     effects.forEach((effect, index) => {
+
+        // calculate difference between positions now and at the time of creating the effect to avoid effects showing
+        // up in the wrong places (especially when moving around after an effect was triggered)
+        const mapDiffX = (player.x - innerMap.x) - (effect.startAffectedCharacterX - effect.startX);
+        const mapDiffY = (player.y - innerMap.y) - (effect.startAffectedCharacterY - effect.startY);
+
         switch (effect.type) {
             case Effects.SMOKE:
-                if (mode === 'over') { // todo: let the effect itself determine whether its over or under
+                if (mode === effect.placement) {
                     context.save();
+                    const centeredX = -engine.tileWidth / 2;
+                    const centeredY = -engine.tileHeight / 2;
+                    context.translate(centeredX, centeredY);
                     context.globalAlpha = .4;
                     context.beginPath();
-                    context.arc(effect.x, effect.y, effect.radius, 0, 2 * Math.PI, false);
+                    context.arc(effect.x - mapDiffX, effect.y - mapDiffY, effect.radius, 0, 2 * Math.PI, false);
                     context.fillStyle = effect.color;
                     context.fill();
                     context.restore();
@@ -566,21 +641,27 @@ const drawEffects = (mode) => {
                     }
                 }
                 break;
-            case Effects.SPARKS:
-                if (mode==='under') {// todo: let the effect itself determine whether its over or under
+            case Effects.COINS:
+                if (mode === effect.placement) {
                     context.save();
                     context.beginPath();
-                    context.fillStyle = effect.color;
-                    context.arc(effect.x < innerMap.x ? effect.x -= 1.8 / effect.counter : effect.x += 1.8 / effect.counter, effect.startY - effect.y, effect.radius, 0, 2 * Math.PI, false);
+                    context.fillStyle = '#ffd700';
+                    context.arc(
+                        ((effect.x += effect.addX / effect.counter)) - mapDiffX,
+                        effect.y - mapDiffY,
+                        effect.radius,
+                        0,
+                        2 * Math.PI,
+                        false
+                    );
                     context.fill();
                     context.strokeStyle= '#8F7900';
                     context.stroke();
-                    // context.fillRect(effect.x < innerMap.x ? effect.x -= .8 / effect.counter : effect.x += .8 / effect.counter, effect.startY - effect.y, effect.radius, effect.radius);
                     context.globalAlpha = .4;
                     context.restore();
 
-                    effect.counter += 0.2;
-                    effect.y += (((6 - effect.counter) * Math.sin(effect.counter)) / 2);
+                    effect.counter += .2;
+                    effect.y -= (((6 - effect.counter) * Math.sin(effect.counter)) / 3);
 
                     if (effect.counter >= 2.6 * Math.PI) {
                         effects.splice(index, 1);
@@ -674,7 +755,7 @@ const handleObjectCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
 }
 
 const handleCharacterCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
-    let currentCharacter = helpers.Character.getCharacterForCurrentGridPosition(player, tempCharacters);
+    let currentCharacter = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x), helpers.Grid.yToGridY(player.y), tempCharacters);
 
     if (currentCharacter) {
 
@@ -684,12 +765,6 @@ const handleCharacterCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
         innerMap.x = oldInnerMapX;
         innerMap.y = oldInnerMapY;
     }
-}
-
-const playSound = sound => {
-    let audio = new Audio();
-    audio.src = sound;
-    audio.play();
 }
 
 const updateCanvas = timestamp => {

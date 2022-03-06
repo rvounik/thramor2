@@ -1,6 +1,6 @@
 const Effects = {
     SMOKE: 'smoke',
-    SPARKS: 'sparks'
+    COINS: 'coins'
 }
 
 export default Effects;

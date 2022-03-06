@@ -14,10 +14,7 @@ export default class Character {
         }
     }
 
-    static getCharacterForCurrentGridPosition(player, tempCharacters) {
-        const tileX = helpers.Grid.xToGridX(player.x);
-        const tileY = helpers.Grid.yToGridY(player.y);
-
+    static getCharacterForGridPosition(tileX, tileY, tempCharacters) {
         for (let obj = 0; obj < tempCharacters.length; obj++) {
             if (helpers.Grid.xToGridX(tempCharacters[obj].x) === tileX &&
                 helpers.Grid.yToGridY(tempCharacters[obj].y) === tileY) {
@@ -33,6 +30,16 @@ export default class Character {
 
         if (character && character[0]) {
             return character[0];
+        }
+
+        return null;
+    }
+
+    static removeCharacterById(characterId, characters) {
+        const characterIndex = characters.findIndex(char => char.id === characterId);
+
+        if (characterIndex || characterIndex === 0) {
+            characters.splice(characterIndex, 1);
         }
 
         return null;

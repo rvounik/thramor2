@@ -7,5 +7,7 @@ export default class SpriteSheet {
         if (spriteSheet && spriteSheet[0]) {
             return spriteSheet[0];
         }
+
+        return null;
     }
 }

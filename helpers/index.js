@@ -7,5 +7,17 @@ import Tile from './Tile.js';
 import SpriteSheet from './SpriteSheet.js';
 import Object from './Object.js';
 import Effect from './Effect.js';
+import Sound from './Sound.js';
 
-export default { Utils, Canvas, Grid, Character, Animation, Tile, SpriteSheet, Object, Effect }
+export default {
+    Utils,
+    Canvas,
+    Grid,
+    Character,
+    Animation,
+    Tile,
+    SpriteSheet,
+    Object,
+    Effect,
+    Sound
+}
