@@ -36,7 +36,8 @@ const player = {
     height: playerHeight,
     direction: 'down',
     attacking: false,
-    strength: 10
+    strength: 10,
+    coins: 100
 }
 
 const engine = {
@@ -221,13 +222,29 @@ const handleAfterAttack = id => {
                 effects
             );
 
+            const coinObj =
+                {
+                    id: 103,
+                    gridX: helpers.Grid.xToGridX(char.x),
+                    gridY: helpers.Grid.yToGridY(char.y),
+                    handle: '103_coin',
+                    src: '/assets/objects/103_coin.png',
+                    img: new Image(), // this is not initialised when you push it like this
+                    structure: Structures.PICKUP, // trap, item etc. todo: or just solid, liquid etc?
+                    status: 'shown' // picked up etc. todo: can be removed?
+                };
+
+            coinObj['img'].src = coinObj['src']
+            objects.push(coinObj);
+
             helpers.Character.removeCharacterById(char.id, characters);
 
-            // todo: leave coin behind
+            registerAnimation('coin', 103);
         }
     }
 }
 
+// it only updates the frame counter, nothing more
 const updateAnimations = () => {
     const now = Date.now();
 
@@ -248,15 +265,15 @@ const updateAnimations = () => {
     })
 }
 
-const registerAnimation = (handle, characterId, options) => {
+const registerAnimation = (handle, animationId, options) => {
     const spriteSheet = helpers.SpriteSheet.getSpriteSheetByHandle(handle, spriteSheets);
-    const animation = helpers.Animation.getAnimationById(characterId, animations);
+    const animation = helpers.Animation.getAnimationById(animationId, animations);
 
     // only push if it did not exist already, or it will keep repeating the first frame
     if (!animation) {
         animations.push(
             {
-                id: characterId,
+                id: animationId,
                 handle: handle,
                 frame: spriteSheet.startFrame,
                 startFrame: spriteSheet.startFrame,
@@ -376,12 +393,19 @@ const drawObjects = () => {
 
     // draw objects
     tempObjects.forEach(obj => {
+        let animationOffset = helpers.Animation.getAnimationOffset(obj.id, animations);
+
+        // the clip dimensions, x, y set the starting position (upper-left corner) and width, height are the final sprite dimensions
         context.drawImage(
             obj.img,
+            animationOffset * 50,
+            0,
+            50,
+            50,
             (obj.gridX * engine.tileWidth) - player.x + innerMap.x,
             (obj.gridY * engine.tileHeight) - player.y + innerMap.y,
-            obj['img'].width,
-            obj['img'].height
+            50,
+            50
         );
     });
 }
@@ -608,6 +632,12 @@ const attackPlayer = character => {
         player,
         effects
     );
+
+    player.coins -= 5;
+
+    if (player.coins < 0) {
+        console.log('player ded')
+    }
 }
 
 const drawEffects = (mode) => {
@@ -749,6 +779,16 @@ const handleObjectCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
         player.y = oldY;
         innerMap.x = oldInnerMapX;
         innerMap.y = oldInnerMapY;
+    } else if (currentObject && currentObject.structure === Structures.PICKUP) {
+        console.log('pick up');
+        player.coins += 10; // hard coded, should be determined by object somehow
+
+        // remove it todo: call helper for this
+        const objIndex = objects.findIndex(obj => obj.id === currentObject.id);
+
+        if (objIndex) {
+            objects.splice(objIndex, 1)
+        }
     } else {
         // deal with other types of object Structures like pick-ups, death traps etc.
     }

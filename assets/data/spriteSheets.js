@@ -62,6 +62,14 @@ const SpriteSheets = [
         timeOut: 100,
         startFrame: 0,
         endFrame: 8
+    },
+    {
+        handle: 'coin',
+        src: '/assets/objects/103_coin.png',
+        img: new Image(),
+        timeOut: 100, // mandatory
+        startFrame: 0,
+        endFrame: 6
     }
 ]
 
