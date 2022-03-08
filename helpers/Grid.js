@@ -6,11 +6,13 @@ const tile_height = 50;
 export default class Grid {
 
 // todo: find other places in code that can use this
+    // remember every time you call this helper with the player, add 25 to x,y
     static xToGridX(x) {
         return Math.floor(x / tile_width);
     }
 
 // todo: find other places in code that can use this
+    // remember every time you call this helper with the player, add 25 to x,y
     static yToGridY(y) {
         return Math.floor(y / tile_height);
     }

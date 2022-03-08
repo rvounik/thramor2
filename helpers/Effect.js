@@ -27,8 +27,8 @@ export default class Effect {
                 type: Effects.SMOKE,
                 counter: 0,
                 alpha: 1,
-                x: startX + 25 + (25 - (50 * Math.random())),
-                y: startY + 25 + (25 - (50 * Math.random())),
+                x: startX + 50 + (25 - (50 * Math.random())),
+                y: startY + 50 + (25 - (50 * Math.random())),
                 startX,
                 startY,
                 startAffectedCharacterX: affectedCharacter.x,
@@ -59,9 +59,9 @@ export default class Effect {
      */
     static createCoins(startX, startY, affectedCharacter, effects) {
         for (let c = 0; c < 15; c++) {
-            const x = startX + (15 - (30 * Math.random()));
-            const y = startY + 10 + (5 - (10 * Math.random()));
-            const addX = x < startX ? -(1 + Math.random()) : (1 + Math.random());
+            const x = startX + 25 + (15 - (30 * Math.random()));
+            const y = startY + 35 + (5 - (10 * Math.random()));
+            const addX = x < (startX + 25) ? -(1 + Math.random()) : (1 + Math.random());
 
             effects.push({
                 type: Effects.COINS,

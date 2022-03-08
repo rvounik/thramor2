@@ -9,11 +9,8 @@ export default class Tile {
         }
     }
 
-    static getTileForCurrentGridPosition(player, area, tiles) {
-        const tileX = helpers.Grid.xToGridX(player.x);
-        const tileY = helpers.Grid.yToGridY(player.y);
-
-        return helpers.Tile.getTileById(area[tileY][tileX], tiles);
+    static getTileForGridPosition(gridX, gridY, area, tiles) {
+        return helpers.Tile.getTileById(area[gridY][gridX], tiles);
     }
 
     // todo: wasnt there a way to make context globally available?

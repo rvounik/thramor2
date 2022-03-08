@@ -25,8 +25,8 @@ export default class Animation {
         }
     }
 
-    static getAnimationById(id, animations) {
-        const animation = animations.filter(animation => animation.id === id);
+    static getAnimationByIdAndHandle(id, handle, animations) {
+        const animation = animations.filter(animation => animation.id === id && animation.handle === handle);
 
         if (animation && animation[0]) {
             return animation[0];
@@ -35,8 +35,10 @@ export default class Animation {
         return null;
     }
 
-    static getAnimationOffset(id, animations) {
-        const animation = helpers.Animation.getAnimationById(id, animations);
+    static getAnimationOffset(id, handle, animations) {
+        // since id can be used both in objects as in characters, also check for handle
+
+        const animation = helpers.Animation.getAnimationByIdAndHandle(id, handle, animations);
 
         if (animation) {
             return animation.frame

@@ -3,13 +3,13 @@ import helpers from './index.js';
 export default class Character {
 
     static getOrientatedCharacterHandle(character, player) {
-        if (helpers.Grid.xToGridX(player.x) < helpers.Grid.xToGridX(character.x)) {
+        if (helpers.Grid.xToGridX(player.x + 25) < helpers.Grid.xToGridX(character.x + 25)) {
             return `${character.handlePrefix}_left`;
-        } else if (helpers.Grid.xToGridX(player.x) > helpers.Grid.xToGridX(character.x)) {
+        } else if (helpers.Grid.xToGridX(player.x +25) > helpers.Grid.xToGridX(character.x + 25)) {
             return `${character.handlePrefix}_right`;
-        } else if (helpers.Grid.yToGridY(player.y) > helpers.Grid.yToGridY(character.y)) {
+        } else if (helpers.Grid.yToGridY(player.y +25) > helpers.Grid.yToGridY(character.y + 25)) {
             return `${character.handlePrefix}_down`;
-        } else if (helpers.Grid.yToGridY(player.y) < helpers.Grid.yToGridY(character.y)) {
+        } else if (helpers.Grid.yToGridY(player.y +25) < helpers.Grid.yToGridY(character.y + 25)) {
             return `${character.handlePrefix}_up`;
         }
     }

@@ -201,10 +201,10 @@ const handleAfterAttack = id => {
 
     let char = null;
 
-    if (player.direction === 'right') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x) + 1, helpers.Grid.yToGridY(player.y), tempCharacters); }
-    if (player.direction === 'left') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x) - 1, helpers.Grid.yToGridY(player.y), tempCharacters);}
-    if (player.direction === 'up') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x), helpers.Grid.yToGridY(player.y) -1, tempCharacters); }
-    if (player.direction === 'down') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x), helpers.Grid.yToGridY(player.y) +1, tempCharacters); }
+    if (player.direction === 'right') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25) + 1, helpers.Grid.yToGridY(player.y + 25), tempCharacters); }
+    if (player.direction === 'left') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25) - 1, helpers.Grid.yToGridY(player.y + 25), tempCharacters);}
+    if (player.direction === 'up') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25), helpers.Grid.yToGridY(player.y + 25) -1, tempCharacters); }
+    if (player.direction === 'down') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25), helpers.Grid.yToGridY(player.y + 25) +1, tempCharacters); }
 
     if (char) {
         char.health -= player.strength;
@@ -212,8 +212,7 @@ const handleAfterAttack = id => {
         if (char.health < 0) {
 
             // note by default placing things on a canvas grid has the center point in the upper-left corner
-            // the player sprite is corrected for this, characters are not (will cause all sorts of glitches)
-            // to fix, manually add half a tile when placing effects on characters
+            // to fix, manually add half a tile when placing effects todo: investigate if the effect routine itself can do this
             helpers.Effect.createSmoke(
                 char.x + 25,
                 char.y + 25,
@@ -265,16 +264,18 @@ const updateAnimations = () => {
     })
 }
 
-const registerAnimation = (handle, animationId, options) => {
-    const spriteSheet = helpers.SpriteSheet.getSpriteSheetByHandle(handle, spriteSheets);
-    const animation = helpers.Animation.getAnimationById(animationId, animations);
+// todo: move to Animation.js
+const registerAnimation = (animationHandle, animationId, options) => {
+    const spriteSheet = helpers.SpriteSheet.getSpriteSheetByHandle(animationHandle, spriteSheets);
+    const animationObj = helpers.Animation.getAnimationByIdAndHandle(animationId, animationHandle, animations);
 
     // only push if it did not exist already, or it will keep repeating the first frame
-    if (!animation) {
+    if (!animationObj) {
         animations.push(
             {
+                // id: spriteSheet,
                 id: animationId,
-                handle: handle,
+                handle: animationHandle,
                 frame: spriteSheet.startFrame,
                 startFrame: spriteSheet.startFrame,
                 endFrame: spriteSheet.endFrame,
@@ -307,17 +308,12 @@ const drawPlayer = () => {
     }
 
     const imageObject = helpers.SpriteSheet.getSpriteSheetByHandle(spriteHandle, spriteSheets);
-    let animationOffset = helpers.Animation.getAnimationOffset(1, animations); // hardcoded for 1, which is player
+    let animationOffset = helpers.Animation.getAnimationOffset(1, spriteHandle, animations); // hardcoded for 1, which is player
 
     context.save();
 
     // move context to match innerMap coordinates
     context.translate(innerMap.x, innerMap.y);
-
-    // manually tweak the positioning of the player sprite, so it becomes centered in relation to the tile
-    const centeredX = -engine.tileWidth / 2;
-    const centeredY = -engine.tileHeight / 2;
-    context.translate(centeredX, centeredY);
 
     // ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, width, height);
     // only if you include all these params, are you able to clip the image. clip start is sx, sy, sWidth and sHeight determine
@@ -393,7 +389,7 @@ const drawObjects = () => {
 
     // draw objects
     tempObjects.forEach(obj => {
-        let animationOffset = helpers.Animation.getAnimationOffset(obj.id, animations);
+        let animationOffset = helpers.Animation.getAnimationOffset(obj.id, obj.handle, animations);
 
         // the clip dimensions, x, y set the starting position (upper-left corner) and width, height are the final sprite dimensions
         context.drawImage(
@@ -418,14 +414,14 @@ const getPathToPlayer = character => {
     return finder.findPath(
         helpers.Grid.xToGridX(character.x),
         helpers.Grid.yToGridY(character.y),
-        helpers.Grid.xToGridX(player.x),
-        helpers.Grid.yToGridY(player.y),
+        helpers.Grid.xToGridX(player.x + 25),
+        helpers.Grid.yToGridY(player.y + 25),
         grid
     );
 }
 
 // draws all characters within range
-const drawCharacters = (mode) => {
+const drawCharacters = mode => {
 
     // determine range
     let startX = Math.floor((player.x - innerMap.x - 100));
@@ -441,7 +437,7 @@ const drawCharacters = (mode) => {
 
     // draw characters
     tempCharacters.forEach(char => {
-        const spriteSheetOffset = helpers.Animation.getAnimationOffset(char.id, animations);
+        const spriteSheetOffset = helpers.Animation.getAnimationOffset(char.id, char.handle, animations);
         const imgData = helpers.SpriteSheet.getSpriteSheetByHandle(char.handle, spriteSheets);
         const yPos = char.y - player.y + innerMap.y;
 
@@ -489,6 +485,7 @@ const moveCharacters = () => {
 
                 // if within range, skip first (own position) and last (player position) and set it as new destination
                 if (directPath.length < character.lineOfSight) {
+
                     directPath.pop();
                     let nextDest = directPath[1];
                     character.destX = nextDest[0];
@@ -501,21 +498,19 @@ const moveCharacters = () => {
                 }
             } else {
 
-                // path too short, too close to player, starting timer
+                // rotate towards player
+                character.handle = helpers.Character.getOrientatedCharacterHandle(character, player);
 
+                // starting attack timer
                 character.attackTimer++;
 
                 if (character.attackTimer >= character.attackInterval) {
-
                     character.attackTimer = 0;
 
                     if (withinAttackRange(character)) {
                         attackPlayer(helpers.Character.getCharacterById(character.id, characters));
                     }
                 }
-
-                // rotate towards player
-                character.handle = helpers.Character.getOrientatedCharacterHandle(character, player);
             }
         } else {
             const speed = character.speed;
@@ -553,7 +548,7 @@ const moveCharacters = () => {
             }
 
             // prevent moving to the exact tile the player is at
-            if (character.destX === helpers.Grid.xToGridX(player.x) && character.destY === helpers.Grid.yToGridY(player.y)) {
+            if (character.destX === helpers.Grid.xToGridX(player.x + 25) && character.destY === helpers.Grid.yToGridY(player.y + 25)) {
                 character.destX = character.startGridX;
                 character.destY = character.startGridY;
             }
@@ -712,29 +707,31 @@ const movePlayer = () => {
     const speed = player.speed;
 
     // the outerMap dimensions are as wide as the defined area (array) minus an offset to ensure screen is always filled up with grid
-    const outerMapWidth = area[0].length * engine.tileWidth - 200;
-    const outerMapHeight = area.length * engine.tileHeight - 200;
+    const outerMapWidth = area[0].length * engine.tileWidth - 250;
+    const outerMapHeight = area.length * engine.tileHeight - 250;
 
     // innerMap limits are 200px from x, y game borders (800x600), so left & right: 200-600 and up & down: 200-400
 
+    const correction = 0; // engine.tileWidth / 2;
+
     if (engine.keys.right) {
-        const innerMapLimit = 600 - (engine.tileWidth / 2);
-        const outerMapLimit = outerMapWidth - (engine.tileWidth / 2);
+        const innerMapLimit = 600 - correction;
+        const outerMapLimit = outerMapWidth - correction;
         if (player.x <= outerMapLimit && (player.x + speed) <= outerMapLimit) { player.x += speed } else { player.x = outerMapLimit }
         if (innerMap.x <= innerMapLimit && (innerMap.x + speed) <= innerMapLimit) { innerMap.x += speed } else { innerMap.x = innerMapLimit }
     } else if (engine.keys.left) {
-        const innerMapLimit = 200 + (engine.tileWidth / 2);
-        const outerMapLimit = 200 + (engine.tileWidth / 2);
+        const innerMapLimit = 200 + correction;
+        const outerMapLimit = 200 + correction;
         if (player.x >= outerMapLimit && (player.x - speed) >= outerMapLimit) { player.x -= speed } else { player.x = outerMapLimit }
         if (innerMap.x >= innerMapLimit && (innerMap.x - speed) >= innerMapLimit) { innerMap.x -= speed } else { innerMap.x = innerMapLimit }
     } else if (engine.keys.down) {
-        const innerMapLimit = 400 - (engine.tileHeight / 2);
-        const outerMapLimit = outerMapHeight - (engine.tileHeight / 2);
+        const innerMapLimit = 400 - correction;
+        const outerMapLimit = outerMapHeight - correction;
         if (player.y <= outerMapLimit && (player.y + speed) <= outerMapLimit) { player.y += speed } else { player.y = outerMapLimit }
         if (innerMap.y <= innerMapLimit && (innerMap.y + speed) <= innerMapLimit) { innerMap.y += speed } else { innerMap.y = innerMapLimit }
     } else if (engine.keys.up) {
-        const innerMapLimit = 200 + (engine.tileHeight / 2);
-        const outerMapLimit = 200 + (engine.tileHeight / 2);
+        const innerMapLimit = 200 + correction;
+        const outerMapLimit = 200 + correction;
         if (player.y >= outerMapLimit && (player.y - speed) >= outerMapLimit) { player.y -= speed } else { player.y = outerMapLimit }
         if (innerMap.y >= innerMapLimit && (innerMap.y - speed) >= innerMapLimit) { innerMap.y -= speed } else { innerMap.y = innerMapLimit }
     }
@@ -746,7 +743,10 @@ const movePlayer = () => {
 }
 
 const handleTileCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
-    const tileType = helpers.Tile.getTileForCurrentGridPosition(player, area, tiles);
+    const gridX = helpers.Grid.xToGridX(player.x + 25);
+    const gridY = helpers.Grid.yToGridY(player.y + 25);
+
+    const tileType = helpers.Tile.getTileForGridPosition(gridX, gridY, area, tiles);
 
     // player moves through liquid
     if (tileType.structure === Structures.LIQUID) {
@@ -770,7 +770,10 @@ const handleTileCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
 }
 
 const handleObjectCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
-    let currentObject = helpers.Object.getObjectForCurrentGridPosition(player, tempObjects);
+    const gridX = helpers.Grid.xToGridX(player.x + 25);
+    const gridY = helpers.Grid.yToGridY(player.y + 25);
+
+    let currentObject = helpers.Object.getObjectForGridPosition(gridX, gridY, tempObjects);
 
     if (currentObject && currentObject.structure === Structures.BLOCK) {
 
@@ -795,7 +798,7 @@ const handleObjectCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
 }
 
 const handleCharacterCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
-    let currentCharacter = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x), helpers.Grid.yToGridY(player.y), tempCharacters);
+    let currentCharacter = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25), helpers.Grid.yToGridY(player.y + 25), tempCharacters);
 
     if (currentCharacter) {
 
@@ -827,8 +830,8 @@ const updateCanvas = timestamp => {
         if (engine.debug) {
             const debugElem = document.querySelector('#debug');
             const now = performance.now();
-            const gridX = helpers.Grid.xToGridX(player.x);
-            const gridY = helpers.Grid.yToGridY(player.y);
+            const gridX = helpers.Grid.xToGridX(player.x + 25);
+            const gridY = helpers.Grid.yToGridY(player.y + 25);
 
             while (engine.fpsTimer.length > 0 && engine.fpsTimer[0] <= now - 1000) { engine.fpsTimer.shift() }
             engine.fpsTimer.push(now);
