@@ -4,7 +4,7 @@ const Objects = [
     {
         id: 100,
         gridX: 7,
-        gridY: 7,
+        gridY: 17,
         handle: '100_rock_a',
         src: '/assets/objects/100_rock_a.png',
         img: new Image(),

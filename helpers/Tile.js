@@ -19,8 +19,16 @@ export default class Tile {
         context.strokeStyle = '#000000';
 
         if (engine.debug) {
+            context.save();
             context.lineWidth = 1;
             context.strokeRect(x, y, engine.tileWidth, engine.tileHeight);
+            context.globalAlpha= .5;
+            context.fillStyle = '#333333';
+            context.fillRect(x + 15 , y + 15, 25, 15);
+            context.font = '10px monospace';
+            context.fillStyle = '#ffffff';
+            context.fillText(tileType.id, x+20, y+25);
+            context.restore();
         }
     }
 }

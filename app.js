@@ -210,37 +210,61 @@ const handleAfterAttack = id => {
         char.health -= player.strength;
 
         if (char.health < 0) {
-
-            // note by default placing things on a canvas grid has the center point in the upper-left corner
-            // to fix, manually add half a tile when placing effects todo: investigate if the effect routine itself can do this
             helpers.Effect.createSmoke(
-                char.x + 25,
-                char.y + 25,
+                char.x,
+                char.y,
                 '#000000',
-                { x: char.x + 25, y: char.y + 25 },
+                { x: char.x, y: char.y },
                 effects
             );
 
+            const nextId = findNextUnusedId(animations);
+
+            // construct coin object
             const coinObj =
                 {
-                    id: 103,
+                    id: nextId,
                     gridX: helpers.Grid.xToGridX(char.x),
                     gridY: helpers.Grid.yToGridY(char.y),
-                    handle: '103_coin',
+                    handle: 'coin',
                     src: '/assets/objects/103_coin.png',
                     img: new Image(), // this is not initialised when you push it like this
                     structure: Structures.PICKUP, // trap, item etc. todo: or just solid, liquid etc?
                     status: 'shown' // picked up etc. todo: can be removed?
                 };
 
-            coinObj['img'].src = coinObj['src']
+            // ensure the source is loaded
+            coinObj['img'].src = coinObj['src'];
+
+            // push to objects
             objects.push(coinObj);
 
+            // remove defeated character
             helpers.Character.removeCharacterById(char.id, characters);
 
-            registerAnimation('coin', 103);
+            // register the coin animation
+            registerAnimation('coin', nextId);
+        } else {
+            helpers.Effect.createSmoke(
+                char.x,
+                char.y,
+                '#ccccff',
+                { x: char.x, y: char.y },
+                effects
+            );
         }
     }
+}
+
+// todo: move to utils
+const findNextUnusedId = arr => {
+    let a = 2; // skip 1 since that is hard-coded to be used for player anim
+
+    while (arr.filter(entry => entry.id === a) && arr.filter(entry => entry.id === a)[0]) {
+        a++;
+    }
+
+    return a;
 }
 
 // it only updates the frame counter, nothing more
@@ -291,7 +315,7 @@ const registerAnimation = (animationHandle, animationId, options) => {
 const drawPlayer = () => {
     let spriteHandle;
 
-    switch(player.direction) {
+    switch (player.direction) {
         case 'left':
             spriteHandle = 'hero_sheet_left';
             break;
@@ -480,8 +504,7 @@ const moveCharacters = () => {
         if (!character.destX || !character.destY) {
             if (directPath && directPath.length > 2) {
 
-                // half this when moving so characters wont attack players the second they reach their destination (unfair)
-                character.attackTimer = 75;
+                character.attackTimer = 50;
 
                 // if within range, skip first (own position) and last (player position) and set it as new destination
                 if (directPath.length < character.lineOfSight) {
@@ -517,8 +540,7 @@ const moveCharacters = () => {
             const destX = character.destX;
             const destY = character.destY;
 
-            // half this when moving so characters wont attack players the second they reach their destination (unfair)
-            character.attackTimer = 75;
+            character.attackTimer = 50;
 
             // move character towards destination, preventing overflow, and using the correctly orientated spriteSheet
             if (character.x < helpers.Grid.gridXtoX(destX)) {
@@ -870,6 +892,8 @@ const createPathfindingGrid = () => {
 
     for (let a = 0; a < area.length; a ++) {
         for (let b = 0; b < area[a].length; b ++) {
+
+            // tood: you want to store this in a lookup array somewhere
             if (area[a][b] < 901 || area[a][b] === 903) {
 
                 // found non-traversable tile (basically everything under 901)

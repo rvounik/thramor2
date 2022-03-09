@@ -36,8 +36,8 @@ export default class Animation {
     }
 
     static getAnimationOffset(id, handle, animations) {
-        // since id can be used both in objects as in characters, also check for handle
 
+        // since id can be used both in objects as in characters, also check for handle
         const animation = helpers.Animation.getAnimationByIdAndHandle(id, handle, animations);
 
         if (animation) {
