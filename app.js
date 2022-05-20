@@ -13,7 +13,8 @@ import spriteSheets from './assets/data/spriteSheets.js';
 import Structures from './constants/Structures.js';
 import Effects from './constants/Effects.js';
 
-let start = null;
+// this deals with the preloading of assets
+let start = null; // todo: poor name
 let progress = 0;
 
 // innerMap dimensions (range: x = 200 - 600, y = 100 - 500) and player coordinates relative to it
@@ -43,7 +44,7 @@ const player = {
 const engine = {
     debug: false,
     fpsTimer: [],
-    rasterLines: true,
+    rasterLines: false,
     tileWidth: 50,
     tileHeight: 50,
     keys: {
@@ -64,7 +65,7 @@ const effects = [];
 let tempObjects = []; // todo: rename visibleObjects?
 
 // holds the reduced characters, only the ones that are (almost) in view
-let tempCharacters = []; // todo: rename visibleCharacters?
+let visibleCharacters = []; // todo: rename visibleCharacters?
 
 // set some vars that handle key mapping
 let KEYCODE_LEFT = 37,
@@ -199,12 +200,28 @@ const handleAfterAttack = id => {
     // reset the flag so you can attack again
     player.attacking = false;
 
-    let char = null;
+    if (!visibleCharacters) {
 
-    if (player.direction === 'right') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25) + 1, helpers.Grid.yToGridY(player.y + 25), tempCharacters); }
-    if (player.direction === 'left') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25) - 1, helpers.Grid.yToGridY(player.y + 25), tempCharacters);}
-    if (player.direction === 'up') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25), helpers.Grid.yToGridY(player.y + 25) -1, tempCharacters); }
-    if (player.direction === 'down') { char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25), helpers.Grid.yToGridY(player.y + 25) +1, tempCharacters); }
+        // no characters on screen, exit right away
+        return false;
+    }
+    // start with checking your own tile
+    let char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25), helpers.Grid.yToGridY(player.y + 25), visibleCharacters);
+
+    if (!char) {
+        if (player.direction === 'right') {
+            char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25) + 1, helpers.Grid.yToGridY(player.y + 25), visibleCharacters);
+        }
+        if (player.direction === 'left') {
+            char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25) - 1, helpers.Grid.yToGridY(player.y + 25), visibleCharacters);
+        }
+        if (player.direction === 'up') {
+            char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25), helpers.Grid.yToGridY(player.y + 25) - 1, visibleCharacters);
+        }
+        if (player.direction === 'down') {
+            char = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25), helpers.Grid.yToGridY(player.y + 25) + 1, visibleCharacters);
+        }
+    }
 
     if (char) {
         char.health -= player.strength;
@@ -453,14 +470,14 @@ const drawCharacters = mode => {
     let startY = Math.floor((player.y - innerMap.y - 100));
     let endY = Math.floor((player.y + 800 - innerMap.y));
 
-    tempCharacters = characters.filter(char =>
+     visibleCharacters = characters.filter(char =>
         char.x >= startX &&
         char.x <= endX &&
         char.y >= startY &&
         char.y <= endY);
 
     // draw characters
-    tempCharacters.forEach(char => {
+     visibleCharacters.forEach(char => {
         const spriteSheetOffset = helpers.Animation.getAnimationOffset(char.id, char.handle, animations);
         const imgData = helpers.SpriteSheet.getSpriteSheetByHandle(char.handle, spriteSheets);
         const yPos = char.y - player.y + innerMap.y;
@@ -497,8 +514,8 @@ const drawCharacters = mode => {
 
 const moveCharacters = () => {
 
-    // work solely with tempCharacters which is already limited to characters that are (almost) on screen
-    tempCharacters.forEach(character => {
+    // work solely with  visibleCharacters which is already limited to characters that are (almost) on screen
+     visibleCharacters.forEach(character => {
         const directPath = getPathToPlayer(character);
 
         if (!character.destX || !character.destY) {
@@ -820,7 +837,7 @@ const handleObjectCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
 }
 
 const handleCharacterCollision = (oldX, oldY, oldInnerMapX, oldInnerMapY) => {
-    let currentCharacter = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25), helpers.Grid.yToGridY(player.y + 25), tempCharacters);
+    let currentCharacter = helpers.Character.getCharacterForGridPosition(helpers.Grid.xToGridX(player.x + 25), helpers.Grid.yToGridY(player.y + 25),  visibleCharacters);
 
     if (currentCharacter) {
 
@@ -910,16 +927,16 @@ const createPathfindingGrid = () => {
     }
 
     // check characters
-    for (let c = 0;c < tempCharacters.length; c ++) {
+    for (let c = 0;c <  visibleCharacters.length; c ++) {
 
     // block current paths
-        let x = helpers.Grid.xToGridX(tempCharacters[c].x)
-        let y = helpers.Grid.yToGridY(tempCharacters[c].y)
+        let x = helpers.Grid.xToGridX( visibleCharacters[c].x)
+        let y = helpers.Grid.yToGridY( visibleCharacters[c].y)
         internalGrid.setWalkableAt(x, y, false);
 
         // also block destination paths
-        x = tempCharacters[c].destX;
-        y = tempCharacters[c].destY;
+        x =  visibleCharacters[c].destX;
+        y =  visibleCharacters[c].destY;
 
         if (x && y) {
             internalGrid.setWalkableAt(x, y, false);
