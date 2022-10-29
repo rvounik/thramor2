@@ -11,6 +11,8 @@ features (so far):
 - Scrolling canvas with dead zones
 - Collision detection
 - Pathfinding
+- Tile engine
+- User controls (cursor keys, space)
 - Sound effects
 
 rvo, 2022
